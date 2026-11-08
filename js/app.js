@@ -271,24 +271,30 @@ class WorkoutApp {
         const statusLabel = document.getElementById('voiceAIStatusLabel');
 
         this.voiceAI.callbacks = {
-            onStateChange: (state) => {
+            onStateChange: (state, isLiveActive) => {
                 if (state === 'listening') {
                     if (orbStage) orbStage.className = 'voice-ai-stage listening';
                     if (micSphere) micSphere.innerHTML = '<i class="fas fa-microphone-lines fa-beat"></i>';
-                    if (statusLabel) statusLabel.innerHTML = '<span class="text-danger fw-bold"><i class="fas fa-circle fa-beat me-1"></i> Mendengarkan Suara Anda... Silakan bicara sekarang!</span>';
+                    if (statusLabel) statusLabel.innerHTML = '<span class="text-danger fw-bold"><i class="fas fa-circle fa-beat me-1"></i> Gemini Live Mendengarkan Anda... Silakan langsung bicara!</span>';
                 } else if (state === 'thinking') {
                     if (orbStage) orbStage.className = 'voice-ai-stage thinking';
                     if (micSphere) micSphere.innerHTML = '<i class="fas fa-brain fa-spin"></i>';
-                    if (statusLabel) statusLabel.innerText = 'Coach sedang menganalisis jawaban terbaik untukmu...';
+                    if (statusLabel) statusLabel.innerHTML = '<span class="text-warning fw-bold"><i class="fas fa-sparkles me-1"></i> Coach sedang merespons...</span>';
                 } else if (state === 'speaking') {
                     if (orbStage) orbStage.className = 'voice-ai-stage speaking';
                     if (micSphere) micSphere.innerHTML = '<i class="fas fa-volume-high fa-beat-fade"></i>';
-                    if (statusLabel) statusLabel.innerHTML = '<span class="text-success fw-bold"><i class="fas fa-wave-square me-1"></i> Coach sedang menjawab dengan suara...</span>';
+                    if (statusLabel) statusLabel.innerHTML = '<span class="text-success fw-bold"><i class="fas fa-wave-square me-1"></i> Coach sedang berbicara... (Setelah selesai, otomatis giliran Anda)</span>';
+                } else if (state === 'paused') {
+                    if (orbStage) orbStage.className = 'voice-ai-stage';
+                    if (micSphere) micSphere.innerHTML = '<i class="fas fa-microphone-slash text-warning"></i>';
+                    if (statusLabel) statusLabel.innerHTML = '<span class="text-warning fw-semibold">Mikrofon dijeda sementara • Klik "Lanjut" untuk berbicara lagi</span>';
                 } else {
                     // Idle
                     if (orbStage) orbStage.className = 'voice-ai-stage';
                     if (micSphere) micSphere.innerHTML = '<i class="fas fa-microphone"></i>';
-                    if (statusLabel) statusLabel.innerText = 'Ketuk mikrofon di atas untuk berbicara langsung dengan Coach AI';
+                    if (statusLabel) statusLabel.innerText = isLiveActive
+                        ? 'Menyiapkan saluran suara dua arah...'
+                        : 'Klik 1x Orb di atas untuk mulai ngobrol dua arah (Hands-Free Gemini Live)';
                 }
             },
 

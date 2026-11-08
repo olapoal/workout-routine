@@ -698,16 +698,21 @@ class VoiceCoachEngine {
 }
 
 /**
- * Voice-to-Voice AI Personal Trainer ("Tanya Coach AI")
- * Mendengarkan trainee lewat microphone & menjawab suara secara instan dengan konteks profil.
+ * Voice-to-Voice AI Personal Trainer ("Gemini Live Hands-Free Mode")
+ * Klik 1x untuk membuka sesi percakapan dua arah tanpa henti (Hands-Free Continuous Conversation):
+ * - Mendengarkan trainee -> Menjawab dengan suara manusia -> Otomatis kembali mendengarkan tanpa perlu klik lagi!
+ * - Mendukung interupsi suara (ketuk atau bicara lagi) dan perintah suara "berhenti / cukup terima kasih" untuk menutup sesi.
  */
 class VoiceAIPersonalTrainer {
     constructor(soundEngine, voiceCoach) {
         this.soundEngine = soundEngine;
         this.voiceCoach = voiceCoach;
         this.recognition = null;
+        this.isLiveSessionActive = false; // Hands-free Gemini Live mode
         this.isListening = false;
         this.isProcessing = false;
+        this.isMutedMic = false;
+        this.restartTimer = null;
         this.geminiApiKey = localStorage.getItem('workout_gemini_api_key') || '';
         this.conversationHistory = [];
 
@@ -722,7 +727,7 @@ class VoiceAIPersonalTrainer {
         }
 
         this.recognition = new SpeechRecognition();
-        this.recognition.continuous = false;
+        this.recognition.continuous = false; // Satu giliran bicara penuh, lalu auto-restart setelah Coach selesai menjawab
         this.recognition.interimResults = true;
         this.recognition.lang = 'id-ID';
 
@@ -743,66 +748,228 @@ class VoiceAIPersonalTrainer {
                 }
             }
 
-            const statusLabel = document.getElementById('voiceAIStatusLabel');
-            if (statusLabel && interimTranscript) {
-                statusLabel.innerHTML = `<span class="text-info"><i class="fas fa-wave-square me-1"></i> Mendengar: "${interimTranscript}..."</span>`;
+            // Jika Coach masih berbicara lalu user mulai bersuara (Barge-In / Interupsi alami ala Gemini Live)
+            if ((interimTranscript.trim().length > 2 || finalTranscript.trim().length > 2) && this.voiceCoach.isSpeaking) {
+                this.voiceCoach.stop();
             }
 
-            if (finalTranscript) {
-                this.handleUserInput(finalTranscript);
+            const statusLabel = document.getElementById('voiceAIStatusLabel');
+            if (statusLabel && interimTranscript) {
+                statusLabel.innerHTML = `<span class="text-info fw-bold"><i class="fas fa-wave-square me-1"></i> Mendengar Anda: "${interimTranscript}..."</span>`;
+            }
+
+            if (finalTranscript && finalTranscript.trim()) {
+                this.handleUserInput(finalTranscript.trim());
             }
         };
 
         this.recognition.onerror = (event) => {
-            console.warn("Speech recognition error:", event.error);
             this.isListening = false;
-            this.triggerStateChange('idle');
+            // Jika hanya hening sejenak ('no-speech') dan sesi Live masih aktif, langsung buka kembali pendengaran tanpa mati!
+            if (this.isLiveSessionActive && !this.isProcessing && !this.isMutedMic) {
+                if (event.error === 'no-speech' || event.error === 'network' || event.error === 'aborted') {
+                    this.scheduleAutoListen(350);
+                    return;
+                }
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    this.stopLiveSession();
+                    alert("Izin mikrofon ditolak oleh browser. Silakan klik ikon kunci/mikrofon di bilah alamat browser dan izinkan akses mikrofon.");
+                    return;
+                }
+            }
+            if (!this.isLiveSessionActive) {
+                this.triggerStateChange('idle');
+            }
         };
 
         this.recognition.onend = () => {
             this.isListening = false;
-            if (!this.isProcessing) {
+            // Jika sesi Gemini Live masih aktif dan Coach tidak sedang berpikir/berbicara, otomatis lanjutkan mendengarkan!
+            if (this.isLiveSessionActive && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isMutedMic) {
+                this.scheduleAutoListen(300);
+            } else if (!this.isLiveSessionActive && !this.isProcessing) {
                 this.triggerStateChange('idle');
             }
         };
     }
 
+    scheduleAutoListen(delayMs = 350) {
+        clearTimeout(this.restartTimer);
+        this.restartTimer = setTimeout(() => {
+            if (this.isLiveSessionActive && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isMutedMic && !this.isListening) {
+                try {
+                    this.recognition.start();
+                } catch (e) {
+                    // Sudah berjalan
+                }
+            }
+        }, delayMs);
+    }
+
+    /**
+     * Klik 1x untuk Mulai Percakapan Hands-Free (Gemini Live Style)
+     * Atau jika Coach sedang bicara, klik Orb akan menyela (Barge-In) dan langsung mendengarkan Anda!
+     */
     toggleListening(callbacks = null) {
         if (callbacks) this.callbacks = callbacks;
         if (!this.recognition) {
-            alert("Browser Anda belum mendukung input mikrofon langsung. Silakan gunakan Google Chrome / Microsoft Edge, atau ketik langsung pertanyaan Anda di kolom chat di bawah!");
+            alert("Browser Anda belum mendukung fitur suara Web Speech API. Silakan gunakan Google Chrome atau Microsoft Edge, atau ketik pertanyaan Anda di kolom chat!");
             return;
         }
 
-        if (this.isListening) {
-            this.recognition.stop();
-            this.isListening = false;
-            this.triggerStateChange('idle');
+        if (!this.isLiveSessionActive) {
+            this.startLiveSession();
         } else {
-            try {
+            // Jika sesi Live sudah aktif dan Coach sedang berbicara, klik pada Orb berfungsi sebagai Interupsi (Potong pembicaraan Coach & langsung bicara)
+            if (this.voiceCoach.isSpeaking) {
                 this.voiceCoach.stop();
-                this.soundEngine.playBeep(650, 0.08);
-                this.recognition.start();
-            } catch (e) {
-                console.warn("Error starting mic:", e);
+                this.isProcessing = false;
+                this.soundEngine.playBeep(680, 0.06);
+                this.scheduleAutoListen(150);
+            } else {
+                // Jika sedang mendengarkan, klik pada Orb atau tombol Akhiri akan menutup sesi Live
+                this.stopLiveSession();
             }
+        }
+    }
+
+    startLiveSession() {
+        if (!this.recognition) return;
+        this.isLiveSessionActive = true;
+        this.isMutedMic = false;
+        this.isProcessing = false;
+        this.voiceCoach.stop();
+        this.soundEngine.playChime();
+
+        this.updateLiveSessionControlsUI(true);
+
+        const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
+
+        // Sapaan singkat pertama saat mode Live dinyalakan, lalu otomatis membuka mikrofon!
+        if (this.conversationHistory.length === 0) {
+            this.triggerStateChange('speaking');
+            const greeting = `Mode percakapan langsung aktif! Bersama ${persona.name} di sini. Silakan bicara langsung, apa yang ingin kita bahas hari ini?`;
+            this.voiceCoach.speak(greeting, () => {
+                if (this.isLiveSessionActive) {
+                    this.soundEngine.playBeep(660, 0.07);
+                    this.scheduleAutoListen(200);
+                }
+            });
+        } else {
+            this.scheduleAutoListen(150);
+        }
+    }
+
+    stopLiveSession(farewellSpeech = null) {
+        this.isLiveSessionActive = false;
+        this.isListening = false;
+        this.isProcessing = false;
+        clearTimeout(this.restartTimer);
+
+        if (this.recognition) {
+            try { this.recognition.stop(); } catch (e) {}
+        }
+
+        this.updateLiveSessionControlsUI(false);
+
+        if (farewellSpeech) {
+            this.voiceCoach.speak(farewellSpeech, () => {
+                this.triggerStateChange('idle');
+            });
+        } else {
+            this.voiceCoach.stop();
+            this.soundEngine.playBeep(440, 0.1);
+            this.triggerStateChange('idle');
+        }
+    }
+
+    toggleMuteLiveMic() {
+        if (!this.isLiveSessionActive) return;
+        this.isMutedMic = !this.isMutedMic;
+        const btnMute = document.getElementById('btnLiveAIMuteMic');
+
+        if (this.isMutedMic) {
+            clearTimeout(this.restartTimer);
+            if (this.recognition) {
+                try { this.recognition.stop(); } catch (e) {}
+            }
+            if (btnMute) {
+                btnMute.innerHTML = '<i class="fas fa-microphone-slash text-danger me-1"></i> Mikrofon Dijeda (Klik untuk Lanjut)';
+                btnMute.classList.replace('btn-outline-light', 'btn-outline-danger');
+            }
+            this.triggerStateChange('paused');
+        } else {
+            if (btnMute) {
+                btnMute.innerHTML = '<i class="fas fa-microphone me-1"></i> Jeda Mikrofon';
+                btnMute.classList.replace('btn-outline-danger', 'btn-outline-light');
+            }
+            this.voiceCoach.stop();
+            this.scheduleAutoListen(150);
+        }
+    }
+
+    updateLiveSessionControlsUI(active) {
+        const liveBadge = document.getElementById('voiceAILiveBadge');
+        const controlsBar = document.getElementById('voiceAILiveControlsBar');
+        const subHint = document.getElementById('voiceAISubHint');
+
+        if (liveBadge) {
+            if (active) {
+                liveBadge.className = 'pro-chip bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50';
+                liveBadge.innerHTML = '<i class="fas fa-circle text-danger fa-beat me-1" style="font-size: 0.55rem;"></i> GEMINI LIVE AKTIF (HANDS-FREE)';
+            } else {
+                liveBadge.className = 'pro-chip chip-active';
+                liveBadge.innerHTML = '<i class="fas fa-circle text-success me-1" style="font-size: 0.5rem;"></i> Siap Percakapan Live';
+            }
+        }
+
+        if (controlsBar) {
+            if (active) controlsBar.classList.remove('d-none');
+            else controlsBar.classList.add('d-none');
+        }
+
+        if (subHint) {
+            subHint.textContent = active
+                ? 'Percakapan 2 arah otomatis aktif • Anda tidak perlu klik lagi setiap selesai bicara (Ketuk Orb jika ingin memotong pembicaraan Coach)'
+                : 'Klik 1x pada Orb untuk memulai percakapan dua arah otomatis layaknya telepon langsung dengan Personal Trainer';
         }
     }
 
     triggerStateChange(state) {
         if (this.callbacks && this.callbacks.onStateChange) {
-            this.callbacks.onStateChange(state);
+            this.callbacks.onStateChange(state, this.isLiveSessionActive);
         }
     }
 
     async handleUserInput(userText) {
         if (!userText || !userText.trim()) return;
         userText = userText.trim();
+
+        // Hentikan rekaman sementara selama Coach sedang memproses & berbicara agar suara Coach tidak terekam ulang (echo)
+        clearTimeout(this.restartTimer);
+        if (this.recognition && this.isListening) {
+            try { this.recognition.stop(); } catch (e) {}
+        }
+
         this.isProcessing = true;
         this.triggerStateChange('thinking');
 
         if (this.callbacks && this.callbacks.onUserMessage) {
             this.callbacks.onUserMessage(userText);
+        }
+
+        // Cek apakah user mengucapkan perintah suara untuk mengakhiri sesi Live
+        const lower = userText.toLowerCase();
+        if (
+            this.isLiveSessionActive &&
+            (lower === 'berhenti' || lower === 'stop' || lower === 'cukup' || lower === 'matikan mikrofon' || lower.includes('akhiri percakapan') || lower.includes('sudah cukup coach'))
+        ) {
+            const byeMsg = "Siap Champion! Sesi percakapan suara kita tutup dulu. Kapan pun kamu butuh panduan lagi, cukup ketuk satu kali tombol Live. Selamat berlatih!";
+            if (this.callbacks && this.callbacks.onCoachReply) {
+                this.callbacks.onCoachReply(byeMsg);
+            }
+            this.stopLiveSession(byeMsg);
+            return;
         }
 
         this.conversationHistory.push({ role: 'user', content: userText });
@@ -825,7 +992,14 @@ class VoiceAIPersonalTrainer {
             this.triggerStateChange('speaking');
             this.voiceCoach.speak(coachReply, () => {
                 this.isProcessing = false;
-                this.triggerStateChange('idle');
+                // KUNCI GEMINI LIVE: Begitu Coach selesai berbicara, OTOMATIS kembali mendengarkan user tanpa perlu diklik lagi!
+                if (this.isLiveSessionActive && !this.isMutedMic) {
+                    this.soundEngine.playBeep(640, 0.05);
+                    this.triggerStateChange('listening');
+                    this.scheduleAutoListen(250);
+                } else {
+                    this.triggerStateChange('idle');
+                }
             });
 
         } catch (err) {
@@ -834,9 +1008,16 @@ class VoiceAIPersonalTrainer {
             if (this.callbacks && this.callbacks.onCoachReply) {
                 this.callbacks.onCoachReply(fallbackReply);
             }
+            this.triggerStateChange('speaking');
             this.voiceCoach.speak(fallbackReply, () => {
                 this.isProcessing = false;
-                this.triggerStateChange('idle');
+                if (this.isLiveSessionActive && !this.isMutedMic) {
+                    this.soundEngine.playBeep(640, 0.05);
+                    this.triggerStateChange('listening');
+                    this.scheduleAutoListen(250);
+                } else {
+                    this.triggerStateChange('idle');
+                }
             });
         }
     }
@@ -919,21 +1100,27 @@ class VoiceAIPersonalTrainer {
 
         const systemPrompt = `Kamu adalah Personal Trainer & Ahli Gizi Fitness profesional bernama "${persona.name}" (${persona.role}).
 ${profileContext}
-Gaya bicaramu sangat berenergi, tegas, suportif, ramah, dan memotivasi seperti PT sungguhan di samping pengguna.
-PENTING: Jawabanmu akan langsung dibacakan dengan suara Text-to-Speech kepada pengguna, jadi jawab secara padat, jelas, tepat sasaran (maksimal 3-5 kalimat penuh semangat), tanpa simbol bintang markdown atau bullet list. Langsung berikan jawaban dan solusi praktis terbaik.`;
+Gaya bicaramu sangat natural seperti manusia sungguhan dalam percakapan telepon dua arah (Gemini Live), berenergi, suportif, ramah, dan memotivasi.
+PENTING: Jawabanmu langsung diucapkan dengan suara kepada pengguna. Jawablah secara ringkas, interaktif, mengalir alami (maksimal 2-4 kalimat), tanpa format markdown/bintang, dan akhiri dengan kalimat tanya pendek yang relevan agar percakapan terus mengalir dua arah!`;
+
+        // Sertakan 6 pesan terakhir agar percakapan nyambung terus seperti ngobrol dengan manusia!
+        const recentHistory = this.conversationHistory.slice(-6).map((item, idx) => ({
+            role: item.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: idx === 0 && item.role === 'user' ? `${systemPrompt}\n\nTrainee berkata: ${item.content}` : item.content }]
+        }));
+
+        if (recentHistory.length === 0) {
+            recentHistory.push({
+                role: 'user',
+                parts: [{ text: `${systemPrompt}\n\nTrainee berkata: ${userText}` }]
+            });
+        }
 
         const payload = {
-            contents: [
-                {
-                    role: "user",
-                    parts: [
-                        { text: `${systemPrompt}\n\nPertanyaan Trainee: ${userText}` }
-                    ]
-                }
-            ],
+            contents: recentHistory,
             generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 250
+                temperature: 0.75,
+                maxOutputTokens: 220
             }
         };
 
