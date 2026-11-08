@@ -991,7 +991,7 @@ function getExerciseAnimationSvg(type = 'pushup', isPlaying = true) {
             <button type="button" class="biomech-ctrl-btn active" onclick="event.stopPropagation(); window.BiomechEngine.toggleHeatmap(this)" title="Tampilkan Heatmap Otot Aktif">
                 <i class="fas fa-fire-flame-curved me-1"></i><span>Otot</span>
             </button>
-            <button type="button" class="biomech-ctrl-btn active" onclick="event.stopPropagation(); window.BiomechEngine.toggleVectors(this)" title="Tampilkan Garis Sudut Biomekanik">
+            <button type="button" class="biomech-ctrl-btn" onclick="event.stopPropagation(); window.BiomechEngine.toggleVectors(this)" title="Tampilkan Garis Sudut Biomekanik">
                 <i class="fas fa-compass-drafting me-1"></i><span>Sudut</span>
             </button>
         </div>
@@ -1006,7 +1006,7 @@ class BiomechanicalAnimatorEngine {
     constructor() {
         this.speedMultiplier = 1.0;
         this.showHeatmap = true;
-        this.showVectors = true;
+        this.showVectors = false;
         this.lastTime = performance.now();
         this.accumTime = 0;
         this.startLoop();
@@ -1070,24 +1070,24 @@ class BiomechanicalAnimatorEngine {
         return a + (b - a) * t;
     }
 
-    // Kurva gerakan otot manusia yang realistis (lambat saat kontrol turun, eksplosif saat dorong, tahan sejenak di puncak)
+    // Kurva gerakan otot manusia yang natural & organik (menggunakan Quintic Smoothstep + napas mikro)
     computeCycle(t, period) {
         const raw = (t % period) / period; // 0..1
-        // 0.0 -> 0.45: fase aktif / konsentrik
-        // 0.45 -> 0.58: puncak kontraksi (peak hold)
-        // 0.58 -> 1.0: fase kembali / eksentrik
+        const smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10); // C2-continuous organic human acceleration
         let val = 0;
         let phase = 'eccentric';
-        if (raw < 0.42) {
-            const p = raw / 0.42;
-            val = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        if (raw < 0.44) {
+            const p = Math.min(1, raw / 0.44);
+            val = smooth(p);
             phase = 'concentric';
-        } else if (raw < 0.56) {
-            val = 1.0;
+        } else if (raw < 0.54) {
+            // Peak isometric squeeze with subtle natural micro-tension
+            const holdP = (raw - 0.44) / 0.10;
+            val = 1.0 - 0.015 * Math.sin(holdP * Math.PI);
             phase = 'peak';
         } else {
-            const p = (raw - 0.56) / 0.44;
-            val = 0.5 + 0.5 * Math.cos(p * Math.PI);
+            const p = Math.min(1, (raw - 0.54) / 0.46);
+            val = 1.0 - smooth(p);
             phase = 'eccentric';
         }
         return { val, phase, raw };
@@ -1227,7 +1227,8 @@ class BiomechanicalAnimatorEngine {
     }
 
     /**
-     * Menggambar segmen anggota tubuh berotot (bukan garis lurus biasa, melainkan kurva anatomis bicep/paha/betis)
+     * Menggambar anggota tubuh manusia (Lengan / Kaki) dengan kulit manusia realistis,
+     * celana olahraga (shorts) pada pangkal paha, kaus kaki atletik, dan TANPA baut/lingkaran sendi robot!
      */
     drawSculptedLimb(ctx, x1, y1, x2, y2, r1, rBelly, r2, opts = {}) {
         const dx = x2 - x1;
@@ -1240,67 +1241,152 @@ class BiomechanicalAnimatorEngine {
 
         const isShadow = opts.isShadow || false;
         const heat = opts.heat || 0;
-        const swell = 1 + 0.16 * heat;
+        const swell = 1 + 0.14 * heat;
         const rbTop = rBelly * swell;
-        const rbBot = rBelly * 0.85 * swell;
+        const rbBot = rBelly * 0.88 * swell;
 
-        const midX = x1 + dx * 0.45;
-        const midY = y1 + dy * 0.45;
+        // Titik puncak lekukan otot (bicep / quadriceps / gastrocnemius)
+        const peakT = opts.skinTone ? 0.44 : 0.40;
+        const midX = x1 + dx * peakT;
+        const midY = y1 + dy * peakT;
 
         ctx.save();
+
+        // Bentuk siluet organik dengan kurva Bezier ganda (mulus menyatu di pangkal & ujung)
         ctx.beginPath();
         ctx.moveTo(x1 + nx * r1, y1 + ny * r1);
-        ctx.quadraticCurveTo(midX + nx * rbTop, midY + ny * rbTop, x2 + nx * r2, y2 + ny * r2);
+        ctx.bezierCurveTo(
+            x1 + dx * 0.22 + nx * (rbTop * 1.05),
+            y1 + dy * 0.22 + ny * (rbTop * 1.05),
+            x1 + dx * 0.68 + nx * (rbTop * 0.92),
+            y1 + dy * 0.68 + ny * (rbTop * 0.92),
+            x2 + nx * r2,
+            y2 + ny * r2
+        );
         ctx.arc(x2, y2, r2, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
-        ctx.quadraticCurveTo(midX - nx * rbBot, midY - ny * rbBot, x1 - nx * r1, y1 - ny * r1);
+        ctx.bezierCurveTo(
+            x1 + dx * 0.68 - nx * (rbBot * 0.88),
+            y1 + dy * 0.68 - ny * (rbBot * 0.88),
+            x1 + dx * 0.22 - nx * (rbBot * 0.98),
+            y1 + dy * 0.22 - ny * (rbBot * 0.98),
+            x1 - nx * r1,
+            y1 - ny * r1
+        );
         ctx.arc(x1, y1, r1, Math.atan2(-ny, -nx), Math.atan2(ny, nx));
         ctx.closePath();
 
         if (isShadow) {
-            ctx.fillStyle = '#1e293b';
+            // Sisi belakang anggota tubuh (dalam bayangan studio)
+            const shGrad = ctx.createLinearGradient(midX + nx * rbTop, midY + ny * rbTop, midX - nx * rbBot, midY - ny * rbBot);
+            shGrad.addColorStop(0, '#9a6544');
+            shGrad.addColorStop(1, '#5c3822');
+            ctx.fillStyle = shGrad;
             ctx.fill();
-            ctx.strokeStyle = '#0f172a';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
         } else {
-            const grad = ctx.createLinearGradient(midX + nx * rbTop, midY + ny * rbTop, midX - nx * rbBot, midY - ny * rbBot);
-            if (opts.skinTone) {
-                grad.addColorStop(0, '#38bdf8');
-                grad.addColorStop(0.5, '#0284c7');
-                grad.addColorStop(1, '#0369a1');
-            } else {
-                grad.addColorStop(0, '#34d399');
-                grad.addColorStop(0.55, '#10b981');
-                grad.addColorStop(1, '#047857');
-            }
-            ctx.fillStyle = grad;
+            // Kulit Manusia Atletis Realistis dengan Pencahayaan Studio 3D (Warm Golden Tan Skin)
+            const skinGrad = ctx.createLinearGradient(midX + nx * rbTop, midY + ny * rbTop, midX - nx * rbBot, midY - ny * rbBot);
+            skinGrad.addColorStop(0, '#f5c6a5');   // Rim highlight kulit
+            skinGrad.addColorStop(0.45, '#e0a378'); // Midtone kulit hangat
+            skinGrad.addColorStop(0.85, '#b8764b'); // Kontur otot dalam
+            skinGrad.addColorStop(1, '#8c5330');    // Core shadow
+            ctx.fillStyle = skinGrad;
             ctx.fill();
 
-            // Thermal Muscle Heatmap Overlay
-            if (heat > 0.05) {
-                const heatGrad = ctx.createRadialGradient(midX, midY, 2, midX, midY, Math.max(len * 0.55, rbTop * 2));
-                heatGrad.addColorStop(0, `rgba(239, 68, 68, ${Math.min(0.92, heat * 0.95)})`);
-                heatGrad.addColorStop(0.55, `rgba(245, 158, 11, ${Math.min(0.75, heat * 0.7)})`);
-                heatGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
-                ctx.fillStyle = heatGrad;
+            // Jika ini segmen Paha (r1 >= 11.5 dan bukan lengan), gambar Celana Pendek Olahraga (Athletic Shorts) di separuh atas paha!
+            if (!opts.skinTone && r1 >= 11.5) {
+                ctx.save();
+                ctx.clip();
+                const shortLen = 0.56;
+                const sxEnd = x1 + dx * shortLen;
+                const syEnd = y1 + dy * shortLen;
+                const shortGrad = ctx.createLinearGradient(x1 + nx * r1, y1 + ny * r1, x1 - nx * r1, y1 - ny * r1);
+                shortGrad.addColorStop(0, '#1e293b');
+                shortGrad.addColorStop(0.5, '#0f172a');
+                shortGrad.addColorStop(1, '#090d16');
+                ctx.fillStyle = shortGrad;
+                ctx.beginPath();
+                ctx.moveTo(x1 - ux * 15 + nx * (r1 * 1.6), y1 - uy * 15 + ny * (r1 * 1.6));
+                ctx.lineTo(sxEnd + nx * (rbTop * 1.5), syEnd + ny * (rbTop * 1.5));
+                ctx.lineTo(sxEnd - nx * (rbBot * 1.5), syEnd - ny * (rbBot * 1.5));
+                ctx.lineTo(x1 - ux * 15 - nx * (r1 * 1.6), y1 - uy * 15 - ny * (r1 * 1.6));
+                ctx.closePath();
+                ctx.fill();
+
+                // Garis aksen emerald di ujung celana pendek olahraga
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(sxEnd + nx * (rbTop * 1.15), syEnd + ny * (rbTop * 1.15));
+                ctx.lineTo(sxEnd - nx * (rbBot * 1.15), syEnd - ny * (rbBot * 1.15));
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Jika ini segmen Betis (r1 < 11.5 dan bukan lengan), gambar Kaus Kaki Olahraga Putih/Gelap di bagian pergelangan kaki
+            if (!opts.skinTone && r1 < 11.5) {
+                ctx.save();
+                ctx.clip();
+                const sockStart = 0.74;
+                const kxStart = x1 + dx * sockStart;
+                const kyStart = y1 + dy * sockStart;
+                ctx.fillStyle = '#e2e8f0';
+                ctx.beginPath();
+                ctx.moveTo(kxStart + nx * 16, kyStart + ny * 16);
+                ctx.lineTo(x2 + ux * 10 + nx * 16, y2 + uy * 10 + ny * 16);
+                ctx.lineTo(x2 + ux * 10 - nx * 16, y2 + uy * 10 - ny * 16);
+                ctx.lineTo(kxStart - nx * 16, kyStart - ny * 16);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Jika ini lengan bawah (r1 <= 8.8 dan skinTone), gambar Kepalan Tangan Manusia (Anatomical Hand/Fist) + Wristband di ujung x2,y2
+            if (opts.skinTone && r1 <= 8.8) {
+                // Athletic Sweat Wristband
+                const wbX = x1 + dx * 0.86;
+                const wbY = y1 + dy * 0.86;
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = r2 * 1.85;
+                ctx.lineCap = 'butt';
+                ctx.beginPath();
+                ctx.moveTo(wbX, wbY);
+                ctx.lineTo(x1 + dx * 0.94, y1 + dy * 0.94);
+                ctx.stroke();
+
+                // Kepalan Tangan Manusia
+                ctx.fillStyle = '#e0a378';
+                ctx.beginPath();
+                ctx.arc(x2 + ux * 2, y2 + uy * 2, r2 * 1.15, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-            ctx.lineWidth = 1.2;
+            // Garis anatomi definisi otot halus (bukan garis robot)
+            ctx.strokeStyle = 'rgba(255, 237, 213, 0.25)';
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            ctx.moveTo(x1 + dx * 0.25 + nx * (rbTop * 0.55), y1 + dy * 0.25 + ny * (rbTop * 0.55));
+            ctx.quadraticCurveTo(midX + nx * (rbTop * 0.72), midY + ny * (rbTop * 0.72), x1 + dx * 0.75 + nx * (r2 * 0.5), y1 + dy * 0.75 + ny * (r2 * 0.5));
             ctx.stroke();
+
+            // Thermal Muscle Fiber Glow (Hanya pada serat otot aktif saat berkontraksi)
+            if (heat > 0.08) {
+                ctx.save();
+                ctx.clip();
+                const heatGrad = ctx.createRadialGradient(midX, midY, 2, midX, midY, Math.max(len * 0.48, rbTop * 1.8));
+                heatGrad.addColorStop(0, `rgba(249, 115, 22, ${Math.min(0.62, heat * 0.65)})`);
+                heatGrad.addColorStop(0.55, `rgba(239, 68, 68, ${Math.min(0.38, heat * 0.42)})`);
+                heatGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                ctx.fillStyle = heatGrad;
+                ctx.fillRect(Math.min(x1, x2) - 40, Math.min(y1, y2) - 40, Math.abs(dx) + 80, Math.abs(dy) + 80);
+                ctx.restore();
+            }
         }
 
-        // Joint articulation caps
-        ctx.fillStyle = isShadow ? '#0f172a' : 'rgba(255, 255, 255, 0.22)';
-        ctx.beginPath();
-        ctx.arc(x1, y1, r1 * 0.55, 0, Math.PI * 2);
-        ctx.fill();
         ctx.restore();
     }
 
     /**
-     * Menggambar Torso Atletis (Dada Pectoral, Punggung Lat, Perut Sixpack Core, & Celana Pelvis)
+     * Menggambar Torso Manusia Atletis dengan Baju Compression Tank-Top Sporty & Celana Pendek
      */
     drawSculptedTorso(ctx, hx, hy, sx, sy, opts = {}) {
         const dx = sx - hx;
@@ -1311,187 +1397,261 @@ class BiomechanicalAnimatorEngine {
         const nx = -uy;
         const ny = ux;
 
-        const wHip = opts.wHip || 14;
-        const wWaist = opts.wWaist || 13;
-        const wChest = opts.wChest || 18;
+        const wHip = opts.wHip || 14.5;
+        const wWaist = opts.wWaist || 13.5;
+        const wChest = opts.wChest || 19.5;
 
         ctx.save();
 
-        // Main Torso Silhouette
         const waistX = hx + dx * 0.42;
         const waistY = hy + dy * 0.42;
-        const chestX = hx + dx * 0.78;
-        const chestY = hy + dy * 0.78;
+        const chestX = hx + dx * 0.76;
+        const chestY = hy + dy * 0.76;
 
+        // Siluet Torso Atletis (V-Taper)
         ctx.beginPath();
         ctx.moveTo(hx + nx * wHip, hy + ny * wHip);
-        ctx.quadraticCurveTo(waistX + nx * wWaist, waistY + ny * wWaist, chestX + nx * wChest, chestY + ny * wChest);
-        ctx.lineTo(sx + nx * (wChest * 0.9), sy + ny * (wChest * 0.9));
-        ctx.arc(sx, sy, wChest * 0.9, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
-        ctx.lineTo(chestX - nx * (wChest * 0.85), chestY - ny * (wChest * 0.85));
-        ctx.quadraticCurveTo(waistX - nx * wWaist, waistY - ny * wWaist, hx - nx * wHip, hy - ny * wHip);
+        ctx.bezierCurveTo(
+            waistX + nx * wWaist,
+            waistY + ny * wWaist,
+            chestX + nx * (wChest * 1.04),
+            chestY + ny * (wChest * 1.04),
+            sx + nx * (wChest * 0.92),
+            sy + ny * (wChest * 0.92)
+        );
+        ctx.arc(sx, sy, wChest * 0.92, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
+        ctx.bezierCurveTo(
+            chestX - nx * (wChest * 0.92),
+            chestY - ny * (wChest * 0.92),
+            waistX - nx * wWaist,
+            waistY - ny * wWaist,
+            hx - nx * wHip,
+            hy - ny * wHip
+        );
         ctx.arc(hx, hy, wHip, Math.atan2(-ny, -nx), Math.atan2(ny, nx));
         ctx.closePath();
 
+        // Athletic Compression Shirt Gradient (Charcoal Midnight dengan 3D Studio Shading)
         const torsoGrad = ctx.createLinearGradient(chestX + nx * wChest, chestY + ny * wChest, chestX - nx * wChest, chestY - ny * wChest);
-        torsoGrad.addColorStop(0, '#1e293b');
-        torsoGrad.addColorStop(0.5, '#0f172a');
+        torsoGrad.addColorStop(0, '#334155');
+        torsoGrad.addColorStop(0.35, '#1e293b');
+        torsoGrad.addColorStop(0.75, '#0f172a');
         torsoGrad.addColorStop(1, '#090d16');
         ctx.fillStyle = torsoGrad;
         ctx.fill();
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-        ctx.lineWidth = 1.5;
+
+        // Garis Jahitan Ergonomis Baju Olahraga (Sportswear Seam Lines)
+        ctx.save();
+        ctx.clip();
+
+        // Celana Olahraga bagian Pinggul / Pelvis
+        const shortsTopX = hx + dx * 0.22;
+        const shortsTopY = hy + dy * 0.22;
+        ctx.fillStyle = '#090d16';
+        ctx.beginPath();
+        ctx.arc(hx, hy, wHip * 1.25, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Karet Pinggang Celana Olahraga (Waistband)
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(shortsTopX + nx * wHip, shortsTopY + ny * wHip);
+        ctx.lineTo(shortsTopX - nx * wHip, shortsTopY - ny * wHip);
         ctx.stroke();
 
-        // Chest / Pectoral Muscle Heatmap
+        // Garis Kontur Dada Pectoral & Seam Baju
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(chestX + nx * (wChest * 0.85), chestY + ny * (wChest * 0.85));
+        ctx.quadraticCurveTo(chestX + nx * (wChest * 0.2), chestY + ny * (wChest * 0.2), sx + nx * (wChest * 0.1), sy + ny * (wChest * 0.1));
+        ctx.stroke();
+
+        // Chest / Pectoral Muscle Activation Glow
         if (opts.chestHeat > 0.05) {
             const pX = chestX + nx * (wChest * 0.45);
             const pY = chestY + ny * (wChest * 0.45);
-            const g = ctx.createRadialGradient(pX, pY, 2, pX, pY, 26);
-            g.addColorStop(0, `rgba(239, 68, 68, ${opts.chestHeat})`);
-            g.addColorStop(0.6, `rgba(245, 158, 11, ${opts.chestHeat * 0.75})`);
+            const g = ctx.createRadialGradient(pX, pY, 2, pX, pY, 24);
+            g.addColorStop(0, `rgba(249, 115, 22, ${opts.chestHeat * 0.72})`);
+            g.addColorStop(0.6, `rgba(239, 68, 68, ${opts.chestHeat * 0.45})`);
             g.addColorStop(1, 'rgba(239, 68, 68, 0)');
             ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.arc(pX, pY, 26, 0, Math.PI * 2);
+            ctx.arc(pX, pY, 24, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Core / Sixpack Abs Heatmap & Segments
+        // Core / Sixpack Abs Activation Glow
         if (opts.absHeat > 0.05) {
-            const aX = waistX + nx * (wWaist * 0.4);
-            const aY = waistY + ny * (wWaist * 0.4);
-            const g = ctx.createRadialGradient(aX, aY, 3, aX, aY, 30);
-            g.addColorStop(0, `rgba(239, 68, 68, ${opts.absHeat})`);
-            g.addColorStop(0.55, `rgba(245, 158, 11, ${opts.absHeat * 0.8})`);
+            const aX = waistX + nx * (wWaist * 0.38);
+            const aY = waistY + ny * (wWaist * 0.38);
+            const g = ctx.createRadialGradient(aX, aY, 3, aX, aY, 28);
+            g.addColorStop(0, `rgba(249, 115, 22, ${opts.absHeat * 0.72})`);
+            g.addColorStop(0.55, `rgba(239, 68, 68, ${opts.absHeat * 0.45})`);
             g.addColorStop(1, 'rgba(239, 68, 68, 0)');
             ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.arc(aX, aY, 30, 0, Math.PI * 2);
+            ctx.arc(aX, aY, 28, 0, Math.PI * 2);
             ctx.fill();
-
-            // Sixpack anatomical rib lines
-            ctx.strokeStyle = `rgba(254, 240, 138, ${0.4 + 0.5 * opts.absHeat})`;
-            ctx.lineWidth = 1.5;
-            for (let i = 1; i <= 3; i++) {
-                const segT = 0.25 + i * 0.13;
-                const sx1 = hx + dx * segT + nx * (wWaist * 0.2);
-                const sy1 = hy + dy * segT + ny * (wWaist * 0.2);
-                const sx2 = hx + dx * segT + nx * (wWaist * 0.85);
-                const sy2 = hy + dy * segT + ny * (wWaist * 0.85);
-                ctx.beginPath();
-                ctx.moveTo(sx1, sy1);
-                ctx.lineTo(sx2, sy2);
-                ctx.stroke();
-            }
         }
 
-        // Back / Latissimus / Erector Spinae Heatmap
+        // Back / Latissimus Activation Glow
         if (opts.backHeat > 0.05) {
-            const bX = waistX - nx * (wWaist * 0.45);
-            const bY = waistY - ny * (wWaist * 0.45);
-            const g = ctx.createRadialGradient(bX, bY, 3, bX, bY, 32);
-            g.addColorStop(0, `rgba(239, 68, 68, ${opts.backHeat})`);
-            g.addColorStop(0.6, `rgba(245, 158, 11, ${opts.backHeat * 0.75})`);
+            const bX = waistX - nx * (wWaist * 0.42);
+            const bY = waistY - ny * (wWaist * 0.42);
+            const g = ctx.createRadialGradient(bX, bY, 3, bX, bY, 28);
+            g.addColorStop(0, `rgba(249, 115, 22, ${opts.backHeat * 0.7})`);
+            g.addColorStop(0.6, `rgba(239, 68, 68, ${opts.backHeat * 0.42})`);
             g.addColorStop(1, 'rgba(239, 68, 68, 0)');
             ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.arc(bX, bY, 32, 0, Math.PI * 2);
+            ctx.arc(bX, bY, 28, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Glutes / Pelvis Heatmap
+        // Glutes Activation Glow
         if (opts.gluteHeat > 0.05) {
             const gX = hx - nx * (wHip * 0.4);
             const gY = hy - ny * (wHip * 0.4);
-            const g = ctx.createRadialGradient(gX, gY, 2, gX, gY, 24);
-            g.addColorStop(0, `rgba(239, 68, 68, ${opts.gluteHeat})`);
-            g.addColorStop(0.6, `rgba(245, 158, 11, ${opts.gluteHeat * 0.75})`);
+            const g = ctx.createRadialGradient(gX, gY, 2, gX, gY, 22);
+            g.addColorStop(0, `rgba(249, 115, 22, ${opts.gluteHeat * 0.72})`);
+            g.addColorStop(0.6, `rgba(239, 68, 68, ${opts.gluteHeat * 0.45})`);
             g.addColorStop(1, 'rgba(239, 68, 68, 0)');
             ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.arc(gX, gY, 24, 0, Math.PI * 2);
+            ctx.arc(gX, gY, 22, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        ctx.restore();
+
+        // Bahu (Deltoid Cap) Manusia Alami agar Lengan Menyatu Mulus dengan Torso
+        const deltGrad = ctx.createRadialGradient(sx - 2, sy - 2, 2, sx, sy, 12);
+        deltGrad.addColorStop(0, '#f5c6a5');
+        deltGrad.addColorStop(0.65, '#e0a378');
+        deltGrad.addColorStop(1, '#b8764b');
+        ctx.fillStyle = deltGrad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 10.5, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.restore();
     }
 
     /**
-     * Menggambar Kepala Atletik Lengkap dengan Leher, Rahang, & Headband
+     * Menggambar Kepala Manusia Atletis (Kulit Manusia, Rahang, Hidung, Telinga, & Potongan Rambut Sporty)
      */
     drawAthleteHead(ctx, sx, sy, hx, hy, lookAngle = 0) {
         ctx.save();
-        // Muscular Neck
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 10;
+
+        // Leher Manusia Berotot (Sternocleidomastoid Shading)
+        const neckGrad = ctx.createLinearGradient(sx - 6, sy, hx + 6, hy);
+        neckGrad.addColorStop(0, '#c8875b');
+        neckGrad.addColorStop(0.5, '#e0a378');
+        neckGrad.addColorStop(1, '#a6683f');
+        ctx.strokeStyle = neckGrad;
+        ctx.lineWidth = 10.5;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(hx, hy);
         ctx.stroke();
 
-        // Head Cranium & Jaw
         ctx.translate(hx, hy);
         ctx.rotate(lookAngle);
 
-        const headGrad = ctx.createRadialGradient(-3, -4, 2, 0, 0, 17);
-        headGrad.addColorStop(0, '#34d399');
-        headGrad.addColorStop(0.7, '#10b981');
-        headGrad.addColorStop(1, '#065f46');
+        // Bentuk Kepala & Rahang Manusia (Bukan Bulatan Robot)
+        const skinGrad = ctx.createRadialGradient(3, -3, 2, 0, 0, 17);
+        skinGrad.addColorStop(0, '#f7ccb0');
+        skinGrad.addColorStop(0.6, '#e0a378');
+        skinGrad.addColorStop(1, '#a86b43');
 
-        ctx.fillStyle = headGrad;
+        ctx.fillStyle = skinGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, 15.5, 0, Math.PI * 2);
+        // Cranium & sculpted jawline
+        ctx.moveTo(-13, -4);
+        ctx.bezierCurveTo(-14, -16, 11, -17, 13, -5);
+        ctx.bezierCurveTo(15, 0, 14, 7, 10, 12); // Hidung & dagu depan
+        ctx.quadraticCurveTo(2, 15, -6, 11);     // Rahang bawah
+        ctx.quadraticCurveTo(-13, 6, -13, -4);
+        ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-        ctx.lineWidth = 1.2;
+
+        // Telinga Manusia
+        ctx.fillStyle = '#cf8e64';
+        ctx.beginPath();
+        ctx.ellipse(-3, 2, 2.6, 4.5, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Potongan Rambut Atletik Modern (Short Textured Crop / Fade)
+        const hairGrad = ctx.createLinearGradient(-14, -18, 12, -2);
+        hairGrad.addColorStop(0, '#1e293b');
+        hairGrad.addColorStop(0.5, '#0f172a');
+        hairGrad.addColorStop(1, '#020617');
+        ctx.fillStyle = hairGrad;
+        ctx.beginPath();
+        ctx.moveTo(-13.5, -2);
+        ctx.bezierCurveTo(-15, -16, -2, -19, 12, -13);
+        ctx.quadraticCurveTo(15, -10, 12, -6);
+        ctx.quadraticCurveTo(3, -9, -5, -6);
+        ctx.quadraticCurveTo(-9, -1, -13.5, -2);
+        ctx.closePath();
+        ctx.fill();
+
+        // Alis & Mata Manusia Natural
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(6.5, -3.2);
+        ctx.lineTo(11.5, -2.5);
         ctx.stroke();
 
-        // Athletic Sweatband
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 4;
+        ctx.fillStyle = '#0f172a';
         ctx.beginPath();
-        ctx.moveTo(-14, -5);
-        ctx.lineTo(14, -5);
-        ctx.stroke();
-
-        // Visor / Eye direction indicator
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(9, 1, 2.2, 0, Math.PI * 2);
+        ctx.arc(8.8, -0.5, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
     }
 
     /**
-     * Menggambar Sepatu Olahraga (Sneaker Atletik)
+     * Menggambar Sepatu Olahraga Pro (Sneaker Training Manusia dengan Sol Cushion & Aksen Sporty)
      */
     drawAthleticShoe(ctx, ax, ay, tx, ty, isShadow = false) {
         ctx.save();
         const dx = tx - ax;
         const dy = ty - ay;
         const angle = Math.atan2(dy, dx);
-        const len = Math.max(22, Math.hypot(dx, dy));
+        const len = Math.max(23, Math.hypot(dx, dy));
 
         ctx.translate(ax, ay);
         ctx.rotate(angle);
 
-        // Shoe upper
-        ctx.fillStyle = isShadow ? '#1e293b' : '#38bdf8';
+        // Knit Shoe Upper (Obsidian / Slate)
+        ctx.fillStyle = isShadow ? '#0f172a' : '#1e293b';
         ctx.beginPath();
-        ctx.moveTo(-6, -6);
-        ctx.lineTo(len * 0.65, -4);
-        ctx.quadraticCurveTo(len, -2, len, 5);
-        ctx.lineTo(-7, 5);
+        ctx.moveTo(-7, -6.5);
+        ctx.lineTo(len * 0.58, -4.5);
+        ctx.quadraticCurveTo(len + 1, -2.5, len + 1, 4.5);
+        ctx.lineTo(-8, 4.5);
         ctx.closePath();
         ctx.fill();
 
-        // White rubber cushion sole
-        ctx.fillStyle = isShadow ? '#475569' : '#f8fafc';
+        if (!isShadow) {
+            // Emerald Athletic Stripe
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(-2, 0.5);
+            ctx.lineTo(len * 0.52, -1.5);
+            ctx.stroke();
+        }
+
+        // White Sculpted EVA Cushion Midsole
+        ctx.fillStyle = isShadow ? '#334155' : '#f8fafc';
         ctx.beginPath();
-        ctx.roundRect(-8, 4, len + 9, 4.5, 2);
+        ctx.roundRect(-8.5, 3.8, len + 10.5, 4.5, 2.2);
         ctx.fill();
 
         ctx.restore();
@@ -1644,10 +1804,10 @@ class BiomechanicalAnimatorEngine {
         this.drawSculptedLimb(ctx, shX, shY, elbX, elbY, 10, 12, 7.5, { skinTone: true, heat: heat });
         this.drawSculptedLimb(ctx, elbX, elbY, handX, handY, 7.5, 8, 5.5, { skinTone: true, heat: heat * 0.6 });
 
-        // Palm on floor
-        ctx.fillStyle = '#38bdf8';
+        // Telapak Tangan Manusia menapak di matras
+        ctx.fillStyle = '#e0a378';
         ctx.beginPath();
-        ctx.roundRect(handX - 14, handY - 5, 22, 6, 3);
+        ctx.roundRect(handX - 14, handY - 5, 21, 5.5, 3);
         ctx.fill();
 
         const deg = this.drawAngleProtractor(ctx, elbX, elbY, shX, shY, handX, handY);
