@@ -1,9 +1,10 @@
 /**
  * js/voice-ai.js
- * Engine Audio & Voice AI Personal Trainer Terlengkap
- * 1. Web Audio API SFX (Beep, Whistle, Fanfare, Rest chime)
- * 2. Voice Coach Real-time Guidance (3 Persona Pelatih Suara Indonesia)
- * 3. Voice-to-Voice AI Chatbot (Speech-to-Text & Instant PT Intelligence Response)
+ * Engine Audio & Live Voice AI Personal Trainer Terlengkap (v3.0)
+ * 1. Web Audio API SFX (Beep, Whistle, Fanfare, Chime, Hype Drum)
+ * 2. Real-Time Voice Coach Engine (3 Persona Pelatih + Live Equalizer & Teleprompter Sync)
+ * 3. Instant PT Actions: Bakar Semangat, Briefing Latihan, Saran Gizi Harian
+ * 4. Voice-to-Voice AI Personal Trainer (Speech-to-Text Interim & Context-Aware PT Intelligence)
  */
 
 class SoundEffectsEngine {
@@ -101,7 +102,7 @@ class SoundEffectsEngine {
         }
     }
 
-    // Victory Fanfare Selesai Workout
+    // Victory / Fanfare Selesai Workout
     playVictory() {
         try {
             this.initContext();
@@ -127,6 +128,11 @@ class SoundEffectsEngine {
             console.warn("Victory SFX error:", e);
         }
     }
+
+    // Alias untuk kompatibilitas onboarding
+    playFanfare() {
+        this.playVictory();
+    }
 }
 
 class VoiceCoachEngine {
@@ -137,28 +143,30 @@ class VoiceCoachEngine {
         this.selectedPersona = 'bima'; // 'bima' | 'maya' | 'alex'
         this.volume = 1.0;
         this.activeUtterance = null;
+        this.isSpeaking = false;
+        this.lastSpokenText = '';
 
         this.personas = {
             bima: {
                 name: 'Coach Bima',
                 role: 'Energetik & Disiplin Ala Spartan',
-                pitch: 0.95,
-                rate: 1.06,
-                tagline: 'Pantang menyerah sebelum batasmu tercapai!'
+                pitch: 0.94,
+                rate: 1.05,
+                tagline: 'Pantang menyerah sebelum batasmu tercapai! Ayo sikat habis sesi hari ini!'
             },
             maya: {
                 name: 'Coach Maya',
                 role: 'Suportif & Detail Form Presisi',
                 pitch: 1.15,
-                rate: 0.98,
-                tagline: 'Keren banget! Atur napas, kamu pasti bisa!'
+                rate: 1.0,
+                tagline: 'Keren banget! Atur napasmu, jaga postur tetap stabil, kamu pasti bisa!'
             },
             alex: {
                 name: 'Coach Alex',
                 role: 'Fokus Mind-Muscle & Biomekanik',
                 pitch: 1.0,
                 rate: 1.0,
-                tagline: 'Kendalikan setiap repetisi, rasakan setiap serat otot.'
+                tagline: 'Kendalikan setiap repetisi dengan presisi, rasakan kontraksi maksimal di setiap serat otot.'
             }
         };
 
@@ -180,20 +188,65 @@ class VoiceCoachEngine {
         if (!this.voices || this.voices.length === 0) {
             this.voices = this.synth ? this.synth.getVoices() : [];
         }
-        // Prioritas Bahasa Indonesia
+        // Prioritaskan Google Bahasa Indonesia / Microsoft Gadis / Ardi Natural
+        const idNatural = this.voices.find(v =>
+            v.lang && (v.lang.toLowerCase().includes('id') || v.lang.toLowerCase().includes('ind')) &&
+            (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Online'))
+        );
+        if (idNatural) return idNatural;
+
         const idVoice = this.voices.find(v => v.lang && (v.lang.toLowerCase().includes('id') || v.lang.toLowerCase().includes('ind')));
         if (idVoice) return idVoice;
 
-        // Fallback ke voice Google / Microsoft alami
         const naturalVoice = this.voices.find(v => v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Neural'));
         if (naturalVoice) return naturalVoice;
 
         return this.voices[0] || null;
     }
 
+    /**
+     * Sinkronisasi status visual saat Coach sedang berbicara ke seluruh komponen UI
+     */
+    syncVisualSpeakingState(speaking, text = '') {
+        this.isSpeaking = speaking;
+        if (text) this.lastSpokenText = text;
+
+        // 1. Animasi Soundwave Equalizer di Dashboard & Player
+        document.querySelectorAll('.pt-voice-wave').forEach(el => {
+            if (speaking) el.classList.add('active');
+            else el.classList.remove('active');
+        });
+
+        // 2. Highlight Card Live Command PT
+        document.querySelectorAll('.pt-live-command-card').forEach(el => {
+            if (speaking) el.classList.add('is-speaking');
+            else el.classList.remove('is-speaking');
+        });
+
+        // 3. Update Subtitle Teleprompter di Dashboard & Workout Player
+        if (text) {
+            const dashSub = document.getElementById('liveCoachSubtitleText');
+            if (dashSub) dashSub.textContent = `"${text}"`;
+
+            const playerSub = document.getElementById('playerCoachSpeechText');
+            if (playerSub) playerSub.textContent = text;
+        }
+    }
+
     speak(text, onEndCallback = null) {
-        if (!this.synth || !this.enabled || !text) {
+        if (!text) {
             if (onEndCallback) onEndCallback();
+            return;
+        }
+
+        // Tetap update teleprompter meskipun suara sedang di-mute
+        this.syncVisualSpeakingState(true, text);
+
+        if (!this.synth || !this.enabled) {
+            setTimeout(() => {
+                this.syncVisualSpeakingState(false);
+                if (onEndCallback) onEndCallback();
+            }, 1500);
             return;
         }
 
@@ -212,14 +265,19 @@ class VoiceCoachEngine {
             utterance.rate = persona.rate;
             utterance.volume = this.volume;
 
+            utterance.onstart = () => {
+                this.syncVisualSpeakingState(true, text);
+            };
+
             utterance.onend = () => {
                 this.activeUtterance = null;
+                this.syncVisualSpeakingState(false);
                 if (onEndCallback) onEndCallback();
             };
 
-            utterance.onerror = (err) => {
-                console.warn("TTS Speech error:", err);
+            utterance.onerror = () => {
                 this.activeUtterance = null;
+                this.syncVisualSpeakingState(false);
                 if (onEndCallback) onEndCallback();
             };
 
@@ -227,6 +285,7 @@ class VoiceCoachEngine {
             this.synth.speak(utterance);
         } catch (e) {
             console.warn("VoiceCoach speak error:", e);
+            this.syncVisualSpeakingState(false);
             if (onEndCallback) onEndCallback();
         }
     }
@@ -236,12 +295,92 @@ class VoiceCoachEngine {
             this.synth.cancel();
             this.activeUtterance = null;
         }
+        this.syncVisualSpeakingState(false);
+    }
+
+    /**
+     * FITUR PT INTERAKTIF 1: Bakar Semangat Instan (Locker-Room Pep Talk)
+     */
+    speakMotivationBoost(profile = null) {
+        const persona = this.personas[this.selectedPersona] || this.personas.bima;
+        const streak = profile?.completedDays?.length || 0;
+
+        const speechesBima = [
+            `Dengarkan saya! Rasa malas itu cuma sementara, tapi tubuh atletis dan kesehatan yang kamu bangun hari ini akan bertahan selamanya! Ayo berdiri, pasang fokusmu, kita hancurkan batas hari ini!`,
+            `Ingat alasan kenapa kamu memulai program ini! Setiap tetes keringat yang jatuh hari ini adalah lemak yang terbakar dan otot yang makin tajam. Jangan kasih kendor, gas pol sekarang juga!`,
+            `Sudah ${streak} hari kamu berjuang! Disiplin adalah jembatan antara target dan hasil nyata. Satu sesi lagi hari ini akan membuat dirimu di masa depan berterima kasih. Ayo mulai!`,
+            `Tidak ada kata menyerah di kamus kita! Saat ototmu mulai terasa panas dan bergetar, di situlah perubahan sedang terjadi. Tarik napas dalam, kunci core-mu, dan tunjukkan mental juaramu!`
+        ];
+
+        const speechesMaya = [
+            `Hai Champion! Aku tahu kadang memulai itu terasa berat, tapi percayalah, begitu kamu menyelesaikan pemanasan lima menit pertama, energimu akan langsung menyala! Aku siap memandu setiap repetisimu hari ini!`,
+            `Kamu tidak sendirian! Aku ada di sini untuk memastikan setiap gerakanmu aman, presisi, dan efektif. Fokus saja pada satu gerakan ke gerakan berikutnya. Kamu jauh lebih kuat dari yang kamu kira!`,
+            `Luar biasa progresmu sejauh ini! Ingat, konsistensi jauh lebih penting daripada kesempurnaan. Mari nikmati sesi hari ini dengan senyuman dan napas yang teratur!`
+        ];
+
+        const speechesAlex = [
+            `Fokuskan pikiranmu! Hubungkan kesadaran otak dengan serat otot yang bekerja hari ini. Kita tidak sekadar bergerak, kita sedang memahat arsitektur tubuhmu dengan biomekanik terbaik. Mari eksekusi dengan presisi!`,
+            `Konsistensi biologis tidak pernah berbohong. Setiap repetisi terkontrol yang kamu lakukan hari ini memicu sintesis protein dan metabolisme 24 jam ke depan. Siapkan posisimu!`
+        ];
+
+        let pool = speechesBima;
+        if (this.selectedPersona === 'maya') pool = speechesMaya;
+        if (this.selectedPersona === 'alex') pool = speechesAlex;
+
+        const chosen = pool[Math.floor(Math.random() * pool.length)];
+        this.speak(chosen);
+        return chosen;
+    }
+
+    /**
+     * FITUR PT INTERAKTIF 2: Briefing Sesi Latihan Hari Ini
+     */
+    speakWorkoutBriefing(dayObj, profile = null) {
+        const persona = this.personas[this.selectedPersona] || this.personas.bima;
+        if (!dayObj) {
+            this.speak(`Halo! Saya ${persona.name}. Pilih hari latihanmu di jadwal dan mari kita mulai bergerak!`);
+            return;
+        }
+
+        if (dayObj.isRest) {
+            const msg = `Halo! Bersama ${persona.name} di sini. Hari ke-${dayObj.dayNumber} adalah hari pemulihan aktif atau Rest Day. Ototmu justru tumbuh dan memperbaiki serat-seratnya saat kamu beristirahat. Tugasmu hari ini: penuhi delapan gelas air putih, konsumsi makanan tinggi protein, dan lakukan peregangan ringan selama sepuluh menit!`;
+            this.speak(msg);
+            return msg;
+        }
+
+        const exNames = (dayObj.exercises || []).slice(0, 4).map(e => e.name).join(', ');
+        const totalEx = (dayObj.exercises || []).length;
+        const estMin = Math.round(totalEx * 1.5);
+        const estCal = totalEx * 28;
+
+        const msg = `Briefing latihan Hari ke-${dayObj.dayNumber} bersama ${persona.name}! Fokus kita hari ini adalah ${dayObj.title.replace(/Hari \d+:\s*/i, '')}. Kita akan menuntaskan ${totalEx} gerakan pilihan, termasuk ${exNames}, dengan estimasi waktu sekitar ${estMin} menit untuk membakar hingga ${estCal} kalori. Pastikan botol air minummu sudah siap di dekatmu. Tekan tombol Mulai Latihan Sekarang, dan saya akan memandu setiap detiknya!`;
+        this.speak(msg);
+        return msg;
+    }
+
+    /**
+     * FITUR PT INTERAKTIF 3: Rekomendasi Menu Makan & Nutrisi Harian
+     */
+    speakNutritionGuide(profile = null) {
+        const goal = profile?.goal || 'sixpack';
+        let msg = '';
+
+        if (goal === 'sixpack' || goal === 'belly_fat' || goal === 'fat_loss') {
+            msg = `Saran nutrisi harian dari Coach untuk target pembakaran lemak dan perut sixpack: Sarapan pagi, gunakan tiga butir telur rebus atau orak-arik tanpa minyak berlebih ditambah oatmeal atau pisang. Makan siang, ambil satu kepal nasi merah atau putih, seratus lima puluh gram dada ayam panggang atau ikan bakar, dan semangkuk sayur hijau. Sore hari sebelum latihan, minum kopi hitam tanpa gula atau buah apel. Makan malam, fokus pada protein tinggi seperti tahu, tempe, dada ayam, atau ikan dengan tumis brokoli. Hindari minuman manis kemasan dan gorengan tepung!`;
+        } else if (goal === 'muscle_gain') {
+            msg = `Saran nutrisi harian dari Coach untuk menaikkan massa otot atletis: Pastikan kamu makan empat kali sehari dengan protein tinggi. Sarapan roti gandum atau oatmeal dengan telur dan susu. Makan siang dan malam wajib ada sumber protein utama seperti dada ayam, daging sapi tanpa lemak, ikan, atau tempe dengan porsi karbohidrat nasi atau kentang yang cukup untuk bahan bakar angkat beban. Tambahkan pisang dan selai kacang sebagai camilan sehat setelah latihan!`;
+        } else {
+            msg = `Saran nutrisi seimbang dari Coach: Pastikan setiap piring makanmu terdiri dari setengah porsi sayuran hijau dan buah, seperempat porsi protein berkualitas seperti ayam, ikan, telur, atau tempe, dan seperempat porsi karbohidrat kompleks. Jangan lupa minum minimal dua setengah liter air putih sepanjang hari!`;
+        }
+
+        this.speak(msg);
+        return msg;
     }
 }
 
 /**
  * Voice-to-Voice AI Personal Trainer ("Tanya Coach AI")
- * Mendengarkan trainee lewat microphone & menjawab suara secara instan.
+ * Mendengarkan trainee lewat microphone & menjawab suara secara instan dengan konteks profil.
  */
 class VoiceAIPersonalTrainer {
     constructor(soundEngine, voiceCoach) {
@@ -265,7 +404,7 @@ class VoiceAIPersonalTrainer {
 
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = false;
-        this.recognition.interimResults = false;
+        this.recognition.interimResults = true;
         this.recognition.lang = 'id-ID';
 
         this.recognition.onstart = () => {
@@ -274,9 +413,26 @@ class VoiceAIPersonalTrainer {
         };
 
         this.recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            console.log("Speech input received:", transcript);
-            this.handleUserInput(transcript);
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            // Tampilkan teks live saat trainee sedang berbicara
+            const statusLabel = document.getElementById('voiceAIStatusLabel');
+            if (statusLabel && interimTranscript) {
+                statusLabel.innerHTML = `<span class="text-info"><i class="fas fa-wave-square me-1"></i> Mendengar: "${interimTranscript}..."</span>`;
+            }
+
+            if (finalTranscript) {
+                this.handleUserInput(finalTranscript);
+            }
         };
 
         this.recognition.onerror = (event) => {
@@ -293,10 +449,10 @@ class VoiceAIPersonalTrainer {
         };
     }
 
-    toggleListening(callbacks = {}) {
-        this.callbacks = callbacks;
+    toggleListening(callbacks = null) {
+        if (callbacks) this.callbacks = callbacks;
         if (!this.recognition) {
-            alert("Browser Anda belum mendukung input suara Web Speech API. Silakan gunakan Google Chrome / Edge terbaru atau ketik pertanyaan langsung di kolom chat!");
+            alert("Browser Anda belum mendukung input mikrofon langsung. Silakan gunakan Google Chrome / Microsoft Edge, atau ketik langsung pertanyaan Anda di kolom chat di bawah!");
             return;
         }
 
@@ -306,7 +462,7 @@ class VoiceAIPersonalTrainer {
             this.triggerStateChange('idle');
         } else {
             try {
-                this.voiceCoach.stop(); // Berhenti bicara jika sedang berbicara
+                this.voiceCoach.stop();
                 this.soundEngine.playBeep(650, 0.08);
                 this.recognition.start();
             } catch (e) {
@@ -331,17 +487,14 @@ class VoiceAIPersonalTrainer {
             this.callbacks.onUserMessage(userText);
         }
 
-        // Catat di history
         this.conversationHistory.push({ role: 'user', content: userText });
 
         try {
             let coachReply = '';
 
-            // 1. Jika ada Gemini API Key terpasang, gunakan Gemini AI Live Ultra-Fast
             if (this.geminiApiKey) {
                 coachReply = await this.queryGeminiAI(userText);
             } else {
-                // 2. Gunakan Built-in High-Speed Local Expert PT Brain (< 150ms respon)
                 coachReply = this.queryLocalPTBrain(userText);
             }
 
@@ -351,7 +504,6 @@ class VoiceAIPersonalTrainer {
                 this.callbacks.onCoachReply(coachReply);
             }
 
-            // Coach menjawab dengan suara secara instan!
             this.triggerStateChange('speaking');
             this.voiceCoach.speak(coachReply, () => {
                 this.isProcessing = false;
@@ -360,7 +512,7 @@ class VoiceAIPersonalTrainer {
 
         } catch (err) {
             console.error("AI PT Response Error:", err);
-            const fallbackReply = "Maaf, Coach sempat kehilangan fokus sejenak. Tapi intinya: jaga konsistensi latihan dan pola makan bergizi setiap hari!";
+            const fallbackReply = this.queryLocalPTBrain(userText);
             if (this.callbacks && this.callbacks.onCoachReply) {
                 this.callbacks.onCoachReply(fallbackReply);
             }
@@ -372,75 +524,105 @@ class VoiceAIPersonalTrainer {
     }
 
     /**
-     * Built-in Instant Fitness & Nutrition Knowledge Engine
-     * Jawaban dirancang ringkas, berenergi, akurat secara sains, dan pas untuk dibacakan langsung oleh suara pelatih!
+     * Built-in Context-Aware Expert Personal Trainer Brain
      */
     queryLocalPTBrain(query) {
         const q = query.toLowerCase();
+        const profile = window.appInstance?.profile || null;
+        const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
 
-        // 1. Sixpack / Perut Buncit / Lemak Perut
-        if (q.includes('sixpack') || q.includes('perut buncit') || q.includes('lemak perut') || q.includes('abs') || q.includes('koreksi perut')) {
-            return "Untuk membentuk sixpack dan hilangkan perut buncit, kuncinya ada pada kombinasi defisit kalori harian dan penguatan otot core! Kita tidak bisa membakar lemak hanya di satu titik perut (spot reduction). Tetap konsumsi cukup protein, kurangi gula cair, dan konsisten latih plank serta leg raises!";
+        // 0. Minta Semangat / Motivasi / Malas / Capek Mental
+        if (q.includes('semangat') || q.includes('malas') || q.includes('mager') || q.includes('motivasi') || q.includes('menyerah')) {
+            return `Hei, dengarkan ${persona.name}! Rasa malas atau mager itu musuh terbesar setiap calon juara. Kamu tidak perlu menunggu mood bagus untuk mulai latihan, karena justru perasaan bangga dan hormon endorfin baru akan muncul setelah kamu bergerak lima menit pertama! Ayo ambil posisi sekarang, lakukan satu set saja dulu bersama saya!`;
         }
 
-        // 2. Kebutuhan Protein & Makanan
-        if (q.includes('protein') || q.includes('ayam') || q.includes('telur') || q.includes('whey') || q.includes('nutrisi') || q.includes('makan apa')) {
-            return "Target ideal protein harian untuk trainee adalah sekitar 1.6 hingga 2.0 gram per kilogram berat badan. Misalnya beratmu 60 kg, targetkan 100 sampai 120 gram protein per hari dari dada ayam, telur, tempe tahu, ikan, atau whey protein agar pemulihan otot maksimal!";
+        // 1. Jadwal / Latihan Hari Ini Apa?
+        if (q.includes('jadwal hari ini') || q.includes('latihan apa hari ini') || q.includes('menu latihan')) {
+            const activeDay = window.appInstance?.activeDay || 1;
+            const dayData = profile?.programSchedule?.find(d => d.dayNumber === activeDay);
+            if (dayData) {
+                if (dayData.isRest) {
+                    return `Hari ke-${activeDay} adalah jadwal Rest and Active Recovery! Tubuhmu sedang memulihkan jaringan otot. Fokus minum air putih 2 liter dan peregangan santai ya!`;
+                }
+                const list = dayData.exercises.map(e => e.name).join(', ');
+                return `Jadwal latihanmu pada Hari ke-${activeDay} adalah ${dayData.title}. Kita akan melatih ${dayData.exercises.length} gerakan yaitu: ${list}. Siap kita mulai sekarang?`;
+            }
         }
 
-        // 3. Suplemen: Creatine & Kapan Minum
-        if (q.includes('creatine') || q.includes('kreatin')) {
-            return "Creatine monohydrate adalah suplemen nomor satu paling terbukti secara ilmiah! Minum 3 sampai 5 gram setiap hari secara konsisten, bisa dicampur air putih hangat atau jus. Waktu konsumsinya bebas, yang terpenting rutin setiap hari untuk meningkatkan tenaga dan volume otot!";
+        // 2. Sixpack / Perut Buncit / Lemak Perut
+        if (q.includes('sixpack') || q.includes('perut buncit') || q.includes('lemak perut') || q.includes('abs') || q.includes('buncit')) {
+            return "Untuk memunculkan otot sixpack dan memangkas perut buncit, rahasia utamanya ada dua: pertama, defisit kalori harian sekitar 300 hingga 500 kalori agar lapisan lemak di atas perut menipis. Kedua, latih otot core dengan gerakan di aplikasi ini seperti Plank, Bicycle Crunch, dan Leg Raises untuk menebalkan blok otot perutmu. Kurangi minuman manis dan gorengan, hasilnya akan terlihat jelas dalam 3 sampai 4 minggu!";
         }
 
-        // 4. Kardio Sebelum atau Sesudah Beban?
-        if (q.includes('kardio') && (q.includes('sebelum') || q.includes('sesudah') || q.includes('kapan'))) {
-            return "Saran terbaik Coach: lakukan latihan beban atau kalistenik intensif terlebih dahulu saat energimu masih penuh! Baru setelah itu tutup dengan kardio ringan selama 15 hingga 20 menit untuk pembakaran lemak optimal tanpa menguras tenaga utama.";
+        // 3. Kebutuhan Protein & Menu Makan
+        if (q.includes('protein') || q.includes('ayam') || q.includes('telur') || q.includes('whey') || q.includes('nutrisi') || q.includes('makan apa') || q.includes('menu')) {
+            return "Target protein harian yang ideal untuk membentuk otot dan membakar lemak adalah 1,6 hingga 2 gram per kilogram berat badanmu. Sumber terbaik yang mudah didapat di Indonesia adalah dada ayam, putih dan kuning telur, ikan tuna atau kembung, tempe, tahu, serta susu tinggi protein. Bagi asupan proteinmu merata di sarapan, makan siang, dan makan malam ya!";
         }
 
-        // 5. Pegal-pegal / Sakit Setelah Latihan (DOMS)
-        if (q.includes('pegal') || q.includes('doms') || q.includes('sakit badan') || q.includes('linu') || q.includes('capek')) {
-            return "Rasa pegal itu namanya DOMS (Delayed Onset Muscle Soreness), tanda serat ototmu beradaptasi dengan beban baru. Sangat normal! Atasi dengan tidur 7-8 jam, minum air putih 2-3 liter, konsumsi protein, dan lakukan stretching ringan atau jalan santai untuk melancarkan sirkulasi darah.";
+        // 4. Suplemen: Creatine, Whey, Pre-workout
+        if (q.includes('creatine') || q.includes('kreatin') || q.includes('suplemen')) {
+            return "Creatine monohydrate adalah suplemen paling aman dan paling terbukti secara sains! Cukup minum 5 gram setiap hari dengan air putih untuk meningkatkan tenaga eksplosif, mempercepat pemulihan antar set, dan membuat sel otot tampak lebih penuh dan padat.";
         }
 
-        // 6. Push-up Belum Kuat / Pemula
+        // 5. Kardio Sebelum atau Sesudah Beban?
+        if (q.includes('kardio') || q.includes('lari') || q.includes('jalan kaki')) {
+            return "Strategi terbaik dari Coach: dahulukan latihan beban atau kalistenik utama saat cadangan glikogen dan tenagamu masih 100 persen penuh! Setelah sesi beban selesai, baru tutup dengan kardio seperti jalan cepat atau lari ringan 15 sampai 20 menit untuk memaksimalkan pembakaran cadangan lemak.";
+        }
+
+        // 6. Pegal-pegal / Sakit Setelah Latihan (DOMS)
+        if (q.includes('pegal') || q.includes('doms') || q.includes('sakit badan') || q.includes('linu') || q.includes('nyeri otot')) {
+            return "Rasa pegal 1 sampai 2 hari setelah latihan itu disebut DOMS, tanda bahwa serat ototmu sedang merespons stimulus latihan dan tumbuh lebih kuat! Jangan khawatir, tetaplah bergerak ringan, minum air putih lebih banyak, makan cukup protein, dan tidur minimal 7 jam malam ini.";
+        }
+
+        // 7. Push-up Belum Kuat / Pemula
         if (q.includes('push up') || q.includes('pushup') || q.includes('tangan gemetar') || q.includes('belum kuat')) {
-            return "Tenang, jangan dipaksakan dulu di lantai! Mulailah dengan Incline Push-up di atas meja atau sofa yang kokoh, atau Knee Push-up dengan tumpuan lutut. Kuatkan bahu dan core-mu dulu selama 1-2 minggu, nanti otomatis push-up di lantai akan terasa jauh lebih enteng!";
+            return "Sangat wajar untuk pemula! Jika push-up penuh di lantai masih berat, modifikasi dengan menaruh kedua tangan di tepi meja kokoh atau sofa (Incline Push-up), atau gunakan tumpuan lutut di matras (Knee Push-up). Jaga punggung tetap lurus, lakukan rutin, dalam dua minggu kekuatan dorong dadamu pasti meningkat drastis!";
         }
 
-        // 7. Lutut Sakit / Masalah Sendi saat Squat
-        if (q.includes('lutut') || q.includes('nyeri') || q.includes('sendi') || q.includes('sakit pas squat')) {
-            return "Jika lutut terasa nyeri saat squat, cek apakah lututmu jatuh menekuk ke dalam atau tumitmu terangkat. Pastikan beban berada di tumit dan dorong pinggul ke belakang seperti hendak duduk di kursi. Kamu juga bisa beralih sementara ke Glute Bridge dan Wall Sit yang sangat ramah sendi!";
+        // 8. Lutut Sakit / Masalah Sendi saat Squat atau Lunge
+        if (q.includes('lutut') || q.includes('sendi') || q.includes('sakit pas squat') || q.includes('cedera')) {
+            return "Keamanan sendi adalah prioritas utama! Jika lutut terasa kurang nyaman saat squat, pastikan kamu mendorong bokong ke belakang terlebih dahulu seperti hendak duduk di kursi, tumpukan berat di tumit, dan buka lutut searah ujung jari kaki. Hindari gerakan melompat sementara waktu dan ganti dengan Glute Bridge yang sangat aman bagi lutut!";
         }
 
-        // 8. Turun Berat Badan / Defisit Kalori
-        if (q.includes('turun berat badan') || q.includes('diet') || q.includes('defisit kalori') || q.includes('kurus')) {
-            return "Hukum utama menurunkan berat badan adalah defisit kalori sekitar 300 sampai 500 kalori di bawah kebutuhan harianmu (TDEE). Perbanyak sayuran tinggi serat, penuhi protein agar massa otot tidak susut, dan kombinasikan dengan workout rutin yang ada di aplikasi ini!";
+        // 9. Waktu Terbaik Olahraga (Pagi / Sore / Malam)
+        if (q.includes('pagi') || q.includes('malam') || q.includes('sore') || q.includes('waktu terbaik') || q.includes('jam berapa')) {
+            return "Secara fisiologis, kekuatan otot dan suhu tubuh berada di puncaknya pada sore hari sekitar pukul 4 hingga 6 sore. Namun, latihan pagi hari juga luar biasa untuk mendongkrak metabolisme dan mood seharian. Jika berlatih malam hari, selesaikan minimal 1,5 jam sebelum jam tidur agar detak jantungmu sempat turun dan tidurmu tetap nyenyak!";
         }
 
-        // 9. Bulking vs Naik Berat Badan / Otot
-        if (q.includes('bulking') || q.includes('naikin berat badan') || q.includes('otot lebih besar') || q.includes('tambah berat')) {
-            return "Untuk menaikkan massa otot yang padat (lean bulk), makanlah dalam surplus kalori ringan sekitar 300 kalori di atas TDEE dengan protein tinggi. Fokus pada progressive overload yaitu menambah repetisi atau kesulitan gerakan setiap minggu!";
+        // 10. Pernapasan Saat Latihan
+        if (q.includes('napas') || q.includes('nafas') || q.includes('ngos')) {
+            return "Aturan emas pernapasan biomekanik: tarik napas lewat hidung pada fase menurunkan beban atau saat otot memanjang (fase eksentrik), dan hembuskan napas kuat lewat mulut saat kamu mendorong atau mengangkat beban (fase konsentrik). Jangan pernah menahan napas terlalu lama agar tekanan darah tetap stabil!";
         }
 
-        // 10. Pertanyaan Default / Motivasi Umum
-        const generalMotivations = [
-            "Konsistensi adalah kuncinya! Jangan menunggu mood datang, mulailah bergerak hari ini dan rasakan progres fisikmu meningkat pesat!",
-            "Kualitas repetisi jauh lebih penting daripada kuantitas yang terburu-buru. Rasakan kontraksi otot di setiap gerakan!",
-            "Tubuh impianmu tidak dibangun dalam semalam, tapi dibangun dari keputusan kecil yang kamu ambil setiap hari di aplikasi ini. Ayo tuntaskan sesi latihanmu!"
-        ];
-        return generalMotivations[Math.floor(Math.random() * generalMotivations.length)];
+        // 11. Turun Berat Badan / Defisit Kalori
+        if (q.includes('turun berat') || q.includes('diet') || q.includes('defisit') || q.includes('kurus') || q.includes('langsing')) {
+            return "Kunci sukses menurunkan berat badan tanpa lemas adalah defisit kalori moderat sekitar 400 kalori di bawah TDEE harianmu. Gunakan tab Kalkulator Nutrisi di aplikasi ini untuk menghitung angka pastinya, perbanyak makan protein dan serat sayur agar kenyang lebih lama, serta tuntaskan jadwal latihan harianmu!";
+        }
+
+        // 12. Bulking / Menaikkan Berat Badan & Massa Otot
+        if (q.includes('bulking') || q.includes('naik berat') || q.includes('gemuk') || q.includes('otot besar') || q.includes('kurus banget')) {
+            return "Untuk menambah massa otot yang bersih (Lean Bulking), kamu butuh surplus sekitar 300 kalori di atas kebutuhan harianmu dan tidur yang berkualitas. Fokus pada latihan progresif: tambah jumlah repetisi atau perlambat tempo turun gerakanmu agar tegangan otot makin maksimal!";
+        }
+
+        // 13. Jawaban Kontekstual Pintar Default
+        return `Pertanyaan yang bagus! Sebagai Personal Trainer-mu, ${persona.name} menyarankan tiga pilar utama untuk menjawab hal tersebut: pertama, jaga kualitas teknik dan tempo di setiap repetisi; kedua, pastikan kebutuhan protein harian serta hidrasi 2 liter air terpenuhi; dan ketiga, konsisten ikuti kurikulum latihan yang sudah kita susun. Mau kita bahas lebih spesifik soal latihan hari ini atau menu makanmu?`;
     }
 
     /**
-     * Integrasi Google Gemini API (Real-time Live Intelligence)
+     * Integrasi Google Gemini API (Real-time Live Intelligence dengan Konteks Profil)
      */
     async queryGeminiAI(userText) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`;
-        
-        const systemPrompt = `Kamu adalah Personal Trainer & Ahli Gizi Gym profesional kelas dunia bernama "Coach AI". 
-Gaya bicaramu sangat berenergi, tegas, suportif, ramah, dan memotivasi (bahasa Indonesia kasual tapi sopan).
-PENTING: Jawabanmu akan langsung dibacakan dengan suara Text-to-Speech kepada pengguna, jadi jawab secara padat, jelas, tepat sasaran (maksimal 2-3 paragraf pendek), tanpa format markdown yang rumit seperti simbol bintang atau bullet list berlebih. Langsung sampaikan solusi praktis terbaik.`;
+        const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
+        const profile = window.appInstance?.profile;
+        const profileContext = profile
+            ? `Profil Trainee saat ini: Level=${profile.level}, Target=${profile.goal}, Alat=${profile.equipment}, Durasi=${profile.duration} hari, Hari selesai=${profile.completedDays?.length || 0}.`
+            : '';
+
+        const systemPrompt = `Kamu adalah Personal Trainer & Ahli Gizi Fitness profesional bernama "${persona.name}" (${persona.role}).
+${profileContext}
+Gaya bicaramu sangat berenergi, tegas, suportif, ramah, dan memotivasi seperti PT sungguhan di samping pengguna.
+PENTING: Jawabanmu akan langsung dibacakan dengan suara Text-to-Speech kepada pengguna, jadi jawab secara padat, jelas, tepat sasaran (maksimal 3-5 kalimat penuh semangat), tanpa simbol bintang markdown atau bullet list. Langsung berikan jawaban dan solusi praktis terbaik.`;
 
         const payload = {
             contents: [

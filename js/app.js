@@ -59,8 +59,37 @@ class WorkoutApp {
         const selectVoiceEl = document.getElementById('settingVoicePersona');
         if (selectVoiceEl) selectVoiceEl.value = savedVoice;
 
+        const quickPersonaEl = document.getElementById('quickPersonaSelect');
+        if (quickPersonaEl) quickPersonaEl.value = savedVoice;
+
+        this.updateCoachCommandBarPersona(savedVoice);
+
         const geminiInput = document.getElementById('inputGeminiApiKey');
         if (geminiInput) geminiInput.value = localStorage.getItem('workout_gemini_api_key') || '';
+    }
+
+    updateCoachCommandBarPersona(personaKey) {
+        const persona = this.voiceCoach.personas[personaKey] || this.voiceCoach.personas.bima;
+        const titleEl = document.getElementById('liveCoachPersonaTitle');
+        const roleEl = document.getElementById('liveCoachPersonaRole');
+        if (titleEl) titleEl.textContent = `${persona.name} — AI Personal Trainer`;
+        if (roleEl) roleEl.textContent = `${persona.role} • Siap Memandu Suara`;
+    }
+
+    triggerCoachPepTalk() {
+        if (this.soundEngine) this.soundEngine.playChime();
+        this.voiceCoach.speakMotivationBoost(this.profile);
+    }
+
+    triggerCoachDailyBriefing() {
+        if (this.soundEngine) this.soundEngine.playBeep(640, 0.08);
+        const currentDayData = this.profile?.programSchedule?.find(d => d.dayNumber === this.activeDay) || this.profile?.programSchedule?.[0];
+        this.voiceCoach.speakWorkoutBriefing(currentDayData, this.profile);
+    }
+
+    triggerCoachNutritionGuide() {
+        if (this.soundEngine) this.soundEngine.playBeep(720, 0.08);
+        this.voiceCoach.speakNutritionGuide(this.profile);
     }
 
     bindEvents() {
@@ -119,7 +148,7 @@ class WorkoutApp {
         }
 
         // Quick Suggestion Chips untuk Tanya Coach AI
-        document.querySelectorAll('.ai-prompt-chip').forEach(chip => {
+        document.querySelectorAll('.prompt-pill, .ai-prompt-chip').forEach(chip => {
             chip.addEventListener('click', () => {
                 const prompt = chip.getAttribute('data-prompt');
                 if (prompt) {
@@ -127,6 +156,21 @@ class WorkoutApp {
                 }
             });
         });
+
+        // Quick Persona Select di Dashboard Command Bar
+        const quickPersonaEl = document.getElementById('quickPersonaSelect');
+        if (quickPersonaEl) {
+            quickPersonaEl.addEventListener('change', (e) => {
+                const val = e.target.value;
+                this.voiceCoach.selectedPersona = val;
+                localStorage.setItem('workout_voice_persona', val);
+                const settingSelect = document.getElementById('settingVoicePersona');
+                if (settingSelect) settingSelect.value = val;
+                this.updateCoachCommandBarPersona(val);
+                const p = this.voiceCoach.personas[val];
+                this.voiceCoach.speak(`Halo! Sekarang saya ${p.name} yang mendampingi latihanmu. ${p.tagline}`);
+            });
+        }
 
         // Verifikasi Email Paywall
         const formAuth = document.getElementById('formVerifyEmail');
@@ -179,8 +223,12 @@ class WorkoutApp {
         const voiceSelect = document.getElementById('settingVoicePersona');
         if (voiceSelect) {
             voiceSelect.addEventListener('change', (e) => {
-                this.voiceCoach.selectedPersona = e.target.value;
-                localStorage.setItem('workout_voice_persona', e.target.value);
+                const val = e.target.value;
+                this.voiceCoach.selectedPersona = val;
+                localStorage.setItem('workout_voice_persona', val);
+                const quickEl = document.getElementById('quickPersonaSelect');
+                if (quickEl) quickEl.value = val;
+                this.updateCoachCommandBarPersona(val);
             });
         }
 
@@ -219,29 +267,28 @@ class WorkoutApp {
 
     setupVoiceAICallbacks() {
         const orbStage = document.getElementById('voiceAIOrbStage');
-        const micBtn = document.getElementById('btnVoiceAIMic');
+        const micSphere = document.querySelector('#btnVoiceAIMic .voice-orb-sphere');
         const statusLabel = document.getElementById('voiceAIStatusLabel');
-        const chatContainer = document.getElementById('voiceAIChatLog');
 
         this.voiceAI.callbacks = {
             onStateChange: (state) => {
                 if (state === 'listening') {
-                    if (orbStage) orbStage.className = 'ai-orb-stage listening';
-                    if (micBtn) micBtn.innerHTML = '<i class="fas fa-microphone-lines"></i>';
-                    if (statusLabel) statusLabel.innerText = 'Coach sedang mendengarkan Anda... Silakan bicara!';
+                    if (orbStage) orbStage.className = 'voice-ai-stage listening';
+                    if (micSphere) micSphere.innerHTML = '<i class="fas fa-microphone-lines fa-beat"></i>';
+                    if (statusLabel) statusLabel.innerHTML = '<span class="text-danger fw-bold"><i class="fas fa-circle fa-beat me-1"></i> Mendengarkan Suara Anda... Silakan bicara sekarang!</span>';
                 } else if (state === 'thinking') {
-                    if (orbStage) orbStage.className = 'ai-orb-stage thinking';
-                    if (micBtn) micBtn.innerHTML = '<i class="fas fa-brain fa-spin"></i>';
-                    if (statusLabel) statusLabel.innerText = 'Coach sedang merumuskan jawaban terbaik...';
+                    if (orbStage) orbStage.className = 'voice-ai-stage thinking';
+                    if (micSphere) micSphere.innerHTML = '<i class="fas fa-brain fa-spin"></i>';
+                    if (statusLabel) statusLabel.innerText = 'Coach sedang menganalisis jawaban terbaik untukmu...';
                 } else if (state === 'speaking') {
-                    if (orbStage) orbStage.className = 'ai-orb-stage speaking';
-                    if (micBtn) micBtn.innerHTML = '<i class="fas fa-volume-high"></i>';
-                    if (statusLabel) statusLabel.innerText = 'Coach sedang berbicara...';
+                    if (orbStage) orbStage.className = 'voice-ai-stage speaking';
+                    if (micSphere) micSphere.innerHTML = '<i class="fas fa-volume-high fa-beat-fade"></i>';
+                    if (statusLabel) statusLabel.innerHTML = '<span class="text-success fw-bold"><i class="fas fa-wave-square me-1"></i> Coach sedang menjawab dengan suara...</span>';
                 } else {
                     // Idle
-                    if (orbStage) orbStage.className = 'ai-orb-stage';
-                    if (micBtn) micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-                    if (statusLabel) statusLabel.innerText = 'Sentuh Orb Mikrofon di atas untuk bertanya langsung dengan suara';
+                    if (orbStage) orbStage.className = 'voice-ai-stage';
+                    if (micSphere) micSphere.innerHTML = '<i class="fas fa-microphone"></i>';
+                    if (statusLabel) statusLabel.innerText = 'Ketuk mikrofon di atas untuk berbicara langsung dengan Coach AI';
                 }
             },
 
@@ -264,12 +311,20 @@ class WorkoutApp {
         msgDiv.className = `chat-bubble-row ${isUser ? 'chat-row-user' : 'chat-row-coach'}`;
 
         const personaName = this.voiceCoach.personas[this.voiceCoach.selectedPersona]?.name || 'Coach AI';
+        const safeText = text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
         msgDiv.innerHTML = `
             <div class="chat-bubble ${isUser ? 'bubble-user' : 'bubble-coach'}">
-                <div class="bubble-header mb-1 small text-muted">
-                    <i class="fas ${isUser ? 'fa-user' : 'fa-dumbbell'} me-1"></i>
-                    ${isUser ? 'Anda' : personaName}
+                <div class="bubble-header mb-1 small text-muted d-flex align-items-center justify-content-between gap-3">
+                    <span>
+                        <i class="fas ${isUser ? 'fa-user' : 'fa-headset text-success'} me-1"></i>
+                        ${isUser ? 'Anda' : personaName}
+                    </span>
+                    ${!isUser ? `
+                        <button type="button" class="btn btn-link btn-sm p-0 text-success text-decoration-none" title="Putar Ulang Suara" onclick="window.appInstance.voiceCoach.speak('${safeText}')">
+                            <i class="fas fa-volume-high me-1"></i>Putar Suara
+                        </button>
+                    ` : ''}
                 </div>
                 <div class="bubble-content">${text}</div>
             </div>
@@ -948,6 +1003,7 @@ class WorkoutApp {
             modal.classList.remove('active');
             modal.style.display = 'none';
             this.voiceCoach.stop();
+            if (window.BiomechEngine) window.BiomechEngine.stopActive();
         }
     }
 
