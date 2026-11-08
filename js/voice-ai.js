@@ -152,10 +152,14 @@ class VoiceCoachEngine {
         this.volume = 1.0;
         this.activeUtterance = null;
         this.activeAudio = null;
+        this.sharedAudioPlayer = new Audio();
+        this.sharedAudioPlayer.preload = 'auto';
         this.abortController = null;
         this.speakRequestId = 0;
         this.isSpeaking = false;
         this.lastSpokenText = '';
+        this.pendingEndCallback = null;
+        this.speakingSafetyTimer = null;
 
         // Cache URL audio neural agar kalimat yang pernah diucapkan langsung diputar 0ms tanpa loading ulang
         this.neuralAudioCache = new Map();
@@ -440,6 +444,7 @@ class VoiceCoachEngine {
 
     /**
      * Bicara menggunakan Suara Manusia Neural (dengan fallback otomatis ke Browser TTS jika offline)
+     * Dilengkapi jaminan eksekusi onEndCallback 100% agar percakapan 2 arah tidak pernah macet!
      */
     async speak(text, onEndCallback = null) {
         if (!text) {
@@ -447,11 +452,36 @@ class VoiceCoachEngine {
             return;
         }
 
-        // Hentikan audio/ucapan sebelumnya
+        // Hentikan audio/ucapan sebelumnya (dan jalankan callback tertunda jika ada)
         this.stop();
 
         const currentReqId = ++this.speakRequestId;
         const persona = this.personas[this.selectedPersona] || this.personas.bima;
+
+        let callbackFired = false;
+        const finishSpeaking = () => {
+            if (callbackFired) return;
+            callbackFired = true;
+            clearTimeout(this.speakingSafetyTimer);
+            if (this.pendingEndCallback === finishSpeaking) {
+                this.pendingEndCallback = null;
+            }
+            this.syncVisualSpeakingState(false);
+            if (onEndCallback) {
+                try { onEndCallback(); } catch (e) { console.error(e); }
+            }
+        };
+
+        this.pendingEndCallback = finishSpeaking;
+
+        // Safety Watchdog Timer: Jaminan mutlak mikrofon tidak akan pernah terkunci jika browser/audio hang
+        const wordCount = text.split(/\s+/).length;
+        const maxSpeakDurationMs = Math.min(20000, Math.max(6000, wordCount * 520 + 4000));
+        this.speakingSafetyTimer = setTimeout(() => {
+            if (this.speakRequestId === currentReqId) {
+                finishSpeaking();
+            }
+        }, maxSpeakDurationMs);
 
         // Langsung tampilkan teks di Teleprompter & nyalakan equalizer
         this.syncVisualSpeakingState(true, text);
@@ -459,10 +489,9 @@ class VoiceCoachEngine {
         if (!this.enabled) {
             setTimeout(() => {
                 if (this.speakRequestId === currentReqId) {
-                    this.syncVisualSpeakingState(false);
-                    if (onEndCallback) onEndCallback();
+                    finishSpeaking();
                 }
-            }, 1500);
+            }, 900);
             return;
         }
 
@@ -474,7 +503,7 @@ class VoiceCoachEngine {
         ) && localMatch.voice.name.toLowerCase().includes(persona.neuralVoice.split('-')[2].replace('Neural', '').toLowerCase());
 
         if (hasLocalTrueNeural) {
-            this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, onEndCallback);
+            this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, finishSpeaking);
             return;
         }
 
@@ -483,15 +512,20 @@ class VoiceCoachEngine {
             this.abortController = new AbortController();
             const timeoutId = setTimeout(() => {
                 if (this.abortController) this.abortController.abort();
-            }, 6500);
+            }, 3400);
 
             const audioUrl = await this.fetchCloudNeuralAudioUrl(text, persona, this.abortController.signal);
             clearTimeout(timeoutId);
 
             // Pastikan belum dibatalkan atau diganti kalimat baru
-            if (this.speakRequestId !== currentReqId) return;
+            if (this.speakRequestId !== currentReqId) {
+                finishSpeaking();
+                return;
+            }
 
-            const audio = new Audio(audioUrl);
+            const audio = this.sharedAudioPlayer || new Audio();
+            audio.pause();
+            audio.src = audioUrl;
             audio.volume = this.volume;
             this.activeAudio = audio;
 
@@ -504,33 +538,34 @@ class VoiceCoachEngine {
             audio.onended = () => {
                 if (this.speakRequestId === currentReqId) {
                     this.activeAudio = null;
-                    this.syncVisualSpeakingState(false);
-                    if (onEndCallback) onEndCallback();
+                    finishSpeaking();
                 }
             };
 
             audio.onerror = () => {
                 if (this.speakRequestId === currentReqId) {
                     this.activeAudio = null;
-                    this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, onEndCallback);
+                    this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, finishSpeaking);
                 }
             };
 
             await audio.play();
         } catch (err) {
-            if (this.speakRequestId !== currentReqId) return;
+            if (this.speakRequestId !== currentReqId) {
+                finishSpeaking();
+                return;
+            }
             console.info("Cloud Neural TTS fallback to local synthesis:", err.message);
-            this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, onEndCallback);
+            this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, finishSpeaking);
         }
     }
 
     /**
      * Fallback ke Web Speech API Browser jika sedang Offline atau gagal koneksi
      */
-    speakWithBrowserSynthesis(text, persona, localMatch, reqId, onEndCallback) {
+    speakWithBrowserSynthesis(text, persona, localMatch, reqId, finishSpeaking) {
         if (!this.synth) {
-            this.syncVisualSpeakingState(false);
-            if (onEndCallback) onEndCallback();
+            if (finishSpeaking) finishSpeaking();
             return;
         }
 
@@ -562,35 +597,35 @@ class VoiceCoachEngine {
             utterance.onend = () => {
                 if (this.speakRequestId === reqId) {
                     this.activeUtterance = null;
-                    this.syncVisualSpeakingState(false);
-                    if (onEndCallback) onEndCallback();
+                    if (finishSpeaking) finishSpeaking();
                 }
             };
 
             utterance.onerror = () => {
                 if (this.speakRequestId === reqId) {
                     this.activeUtterance = null;
-                    this.syncVisualSpeakingState(false);
-                    if (onEndCallback) onEndCallback();
+                    if (finishSpeaking) finishSpeaking();
                 }
             };
 
             this.activeUtterance = utterance;
             this.synth.speak(utterance);
         } catch (e) {
-            this.syncVisualSpeakingState(false);
-            if (onEndCallback) onEndCallback();
+            if (finishSpeaking) finishSpeaking();
         }
     }
 
     stop() {
         this.speakRequestId++;
+        clearTimeout(this.speakingSafetyTimer);
         if (this.abortController) {
             try { this.abortController.abort(); } catch (e) {}
             this.abortController = null;
         }
         if (this.activeAudio) {
             try {
+                this.activeAudio.onended = null;
+                this.activeAudio.onerror = null;
                 this.activeAudio.pause();
                 this.activeAudio.currentTime = 0;
             } catch (e) {}
@@ -601,6 +636,11 @@ class VoiceCoachEngine {
             this.activeUtterance = null;
         }
         this.syncVisualSpeakingState(false);
+        if (this.pendingEndCallback) {
+            const cb = this.pendingEndCallback;
+            this.pendingEndCallback = null;
+            try { cb(); } catch (e) {}
+        }
     }
 
     /**
@@ -713,10 +753,13 @@ class VoiceAIPersonalTrainer {
         this.isLiveSessionActive = false; // Hands-free Gemini Live mode
         this.isListening = false;
         this.isProcessing = false;
+        this.processingStartedAt = 0;
         this.isMutedMic = false;
         this.restartTimer = null;
+        this.liveWatchdogInterval = null;
         this.silenceDebounceTimer = null;
         this.accumulatedTranscript = '';
+        this.lastInterimTranscript = '';
         this.ignoreMicUntil = 0; // Timestamp anti-echo setelah Coach selesai bicara
 
         // Default Embedded Key sudah terpasang otomatis dari bawaan aplikasi!
@@ -758,6 +801,64 @@ class VoiceAIPersonalTrainer {
         return '';
     }
 
+    flushRecognizedSpeech() {
+        clearTimeout(this.silenceDebounceTimer);
+        const combined = (this.accumulatedTranscript + ' ' + this.lastInterimTranscript).trim();
+        this.accumulatedTranscript = '';
+        this.lastInterimTranscript = '';
+        if (combined.length >= 2 && !this.isProcessing && !this.voiceCoach.isSpeaking) {
+            this.handleUserInput(combined);
+            return true;
+        }
+        return false;
+    }
+
+    safeStartRecognition() {
+        if (!this.recognition || !this.isLiveSessionActive || this.isMutedMic || this.isProcessing || this.voiceCoach.isSpeaking) {
+            return;
+        }
+        if (Date.now() < this.ignoreMicUntil) {
+            return;
+        }
+        if (this.isListening) {
+            return;
+        }
+        try {
+            this.recognition.start();
+        } catch (e) {
+            // Jika state browser masih transisi, watchdog akan mencoba lagi 700ms berikutnya
+        }
+    }
+
+    startLiveWatchdog() {
+        this.stopLiveWatchdog();
+        this.liveWatchdogInterval = setInterval(() => {
+            if (!this.isLiveSessionActive) {
+                this.stopLiveWatchdog();
+                return;
+            }
+
+            // Anti-Freeze Guard: Jika isProcessing tertahan > 9 detik padahal Coach belum bicara, lepaskan kunci otomatis
+            if (this.isProcessing && !this.voiceCoach.isSpeaking && this.processingStartedAt > 0 && (Date.now() - this.processingStartedAt > 9000)) {
+                this.isProcessing = false;
+                this.processingStartedAt = 0;
+            }
+
+            // Pastikan mikrofon selalu menyala kembali secara otomatis saat giliran pengguna berbicara
+            if (!this.isMutedMic && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isListening && Date.now() >= this.ignoreMicUntil) {
+                this.triggerStateChange('listening');
+                this.safeStartRecognition();
+            }
+        }, 650);
+    }
+
+    stopLiveWatchdog() {
+        if (this.liveWatchdogInterval) {
+            clearInterval(this.liveWatchdogInterval);
+            this.liveWatchdogInterval = null;
+        }
+    }
+
     initSpeechRecognition() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
@@ -766,19 +867,19 @@ class VoiceAIPersonalTrainer {
         }
 
         this.recognition = new SpeechRecognition();
-        this.recognition.continuous = false;
+        this.recognition.continuous = true;
         this.recognition.interimResults = true;
         this.recognition.lang = 'id-ID';
 
         this.recognition.onstart = () => {
             this.isListening = true;
             this.accumulatedTranscript = '';
+            this.lastInterimTranscript = '';
             this.triggerStateChange('listening');
         };
 
         this.recognition.onresult = (event) => {
-            // ANTI-ECHO GUARD: Abaikan suara jika Coach sedang berbicara atau baru saja selesai bicara (< 650ms)
-            // agar suara speaker Coach tidak masuk kembali ke mikrofon!
+            // ANTI-ECHO GUARD: Abaikan suara jika Coach sedang berbicara atau baru saja selesai bicara (< 450ms)
             if (this.voiceCoach.isSpeaking || this.isProcessing || Date.now() < this.ignoreMicUntil) {
                 return;
             }
@@ -796,24 +897,26 @@ class VoiceAIPersonalTrainer {
 
             if (finalSegment) {
                 this.accumulatedTranscript = (this.accumulatedTranscript + ' ' + finalSegment).trim();
+                this.lastInterimTranscript = '';
+            } else {
+                this.lastInterimTranscript = interimTranscript.trim();
             }
 
-            const livePreview = (this.accumulatedTranscript + ' ' + interimTranscript).trim();
+            const livePreview = (this.accumulatedTranscript + ' ' + this.lastInterimTranscript).trim();
             const statusLabel = document.getElementById('voiceAIStatusLabel');
             if (statusLabel && livePreview) {
                 statusLabel.innerHTML = `<span class="text-info fw-bold"><i class="fas fa-wave-square me-1"></i> Anda: "${livePreview}"</span>`;
             }
 
-            // Gunakan debounce 600ms setelah kalimat final agar jika user jeda napas sejenak kalimatnya tetap utuh & nyambung!
-            if (this.accumulatedTranscript) {
+            // Responsif Dua Arah:
+            // - Jika sudah ada segmen final, tunggu jeda napas singkat 420ms lalu langsung kirim ke Coach!
+            // - Jika masih interim (kalimat pendek), tunggu jeda hening 850ms lalu langsung kirim tanpa menunggu browser menutup mic!
+            if (livePreview.length >= 2) {
                 clearTimeout(this.silenceDebounceTimer);
+                const waitMs = finalSegment ? 420 : 850;
                 this.silenceDebounceTimer = setTimeout(() => {
-                    const readyText = this.accumulatedTranscript.trim();
-                    this.accumulatedTranscript = '';
-                    if (readyText.length >= 2 && !this.isProcessing) {
-                        this.handleUserInput(readyText);
-                    }
-                }, 550);
+                    this.flushRecognizedSpeech();
+                }, waitMs);
             }
         };
 
@@ -821,7 +924,7 @@ class VoiceAIPersonalTrainer {
             this.isListening = false;
             if (this.isLiveSessionActive && !this.isProcessing && !this.isMutedMic && !this.voiceCoach.isSpeaking) {
                 if (event.error === 'no-speech' || event.error === 'network' || event.error === 'aborted') {
-                    this.scheduleAutoListen(400);
+                    this.scheduleAutoListen(250);
                     return;
                 }
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
@@ -837,34 +940,24 @@ class VoiceAIPersonalTrainer {
 
         this.recognition.onend = () => {
             this.isListening = false;
-            // Jika ada transkrip yang sudah terkumpul saat rekaman berhenti, langsung proses!
-            if (this.accumulatedTranscript && this.accumulatedTranscript.trim().length >= 2 && !this.isProcessing) {
-                clearTimeout(this.silenceDebounceTimer);
-                const readyText = this.accumulatedTranscript.trim();
-                this.accumulatedTranscript = '';
-                this.handleUserInput(readyText);
+            // Jika ada transkrip (baik final maupun interim) yang sudah terkumpul saat rekaman berhenti, langsung proses!
+            if (this.flushRecognizedSpeech()) {
                 return;
             }
 
             // Jika sesi Gemini Live masih aktif dan Coach tidak sedang berpikir/berbicara, otomatis lanjutkan mendengarkan!
             if (this.isLiveSessionActive && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isMutedMic) {
-                this.scheduleAutoListen(350);
+                this.scheduleAutoListen(200);
             } else if (!this.isLiveSessionActive && !this.isProcessing) {
                 this.triggerStateChange('idle');
             }
         };
     }
 
-    scheduleAutoListen(delayMs = 450) {
+    scheduleAutoListen(delayMs = 250) {
         clearTimeout(this.restartTimer);
         this.restartTimer = setTimeout(() => {
-            if (this.isLiveSessionActive && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isMutedMic && !this.isListening) {
-                try {
-                    this.recognition.start();
-                } catch (e) {
-                    // Sudah berjalan
-                }
-            }
+            this.safeStartRecognition();
         }, delayMs);
     }
 
@@ -882,11 +975,14 @@ class VoiceAIPersonalTrainer {
         if (!this.isLiveSessionActive) {
             this.startLiveSession();
         } else {
-            // Jika sesi Live sudah aktif dan Coach sedang berbicara, klik pada Orb berfungsi sebagai Interupsi (Potong pembicaraan Coach & langsung bicara)
-            if (this.voiceCoach.isSpeaking) {
+            // Jika sesi Live sudah aktif dan Coach sedang berbicara/berpikir, klik pada Orb berfungsi sebagai Interupsi (Potong pembicaraan Coach & langsung bicara)
+            if (this.voiceCoach.isSpeaking || this.isProcessing) {
                 this.voiceCoach.stop();
                 this.isProcessing = false;
+                this.processingStartedAt = 0;
+                this.ignoreMicUntil = Date.now() + 150;
                 this.soundEngine.playBeep(680, 0.06);
+                this.triggerStateChange('listening');
                 this.scheduleAutoListen(150);
             } else {
                 // Jika sedang mendengarkan, klik pada Orb atau tombol Akhiri akan menutup sesi Live
@@ -900,24 +996,34 @@ class VoiceAIPersonalTrainer {
         this.isLiveSessionActive = true;
         this.isMutedMic = false;
         this.isProcessing = false;
+        this.processingStartedAt = 0;
         this.voiceCoach.stop();
         this.soundEngine.playChime();
 
         this.updateLiveSessionControlsUI(true);
+        this.startLiveWatchdog();
 
         const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
 
         // Sapaan singkat pertama saat mode Live dinyalakan, lalu otomatis membuka mikrofon!
         if (this.conversationHistory.length === 0) {
+            this.isProcessing = true;
+            this.processingStartedAt = Date.now();
             this.triggerStateChange('speaking');
-            const greeting = `Mode percakapan langsung aktif! Bersama ${persona.name} di sini. Silakan bicara langsung, apa yang ingin kita bahas hari ini?`;
+            const greeting = `Halo! Bersama ${persona.name} di sini. Silakan bicara langsung, apa yang ingin kita bahas hari ini?`;
+            this.conversationHistory.push({ role: 'assistant', content: greeting });
             this.voiceCoach.speak(greeting, () => {
+                this.isProcessing = false;
+                this.processingStartedAt = 0;
+                this.ignoreMicUntil = Date.now() + 380;
                 if (this.isLiveSessionActive) {
-                    this.soundEngine.playBeep(660, 0.07);
-                    this.scheduleAutoListen(200);
+                    this.soundEngine.playBeep(660, 0.06);
+                    this.triggerStateChange('listening');
+                    this.scheduleAutoListen(400);
                 }
             });
         } else {
+            this.triggerStateChange('listening');
             this.scheduleAutoListen(150);
         }
     }
@@ -926,7 +1032,10 @@ class VoiceAIPersonalTrainer {
         this.isLiveSessionActive = false;
         this.isListening = false;
         this.isProcessing = false;
+        this.processingStartedAt = 0;
+        this.stopLiveWatchdog();
         clearTimeout(this.restartTimer);
+        clearTimeout(this.silenceDebounceTimer);
 
         if (this.recognition) {
             try { this.recognition.stop(); } catch (e) {}
@@ -952,6 +1061,7 @@ class VoiceAIPersonalTrainer {
 
         if (this.isMutedMic) {
             clearTimeout(this.restartTimer);
+            clearTimeout(this.silenceDebounceTimer);
             if (this.recognition) {
                 try { this.recognition.stop(); } catch (e) {}
             }
@@ -966,6 +1076,8 @@ class VoiceAIPersonalTrainer {
                 btnMute.classList.replace('btn-outline-danger', 'btn-outline-light');
             }
             this.voiceCoach.stop();
+            this.isProcessing = false;
+            this.triggerStateChange('listening');
             this.scheduleAutoListen(150);
         }
     }
@@ -978,7 +1090,7 @@ class VoiceAIPersonalTrainer {
         if (liveBadge) {
             if (active) {
                 liveBadge.className = 'pro-chip bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50';
-                liveBadge.innerHTML = '<i class="fas fa-circle text-danger fa-beat me-1" style="font-size: 0.55rem;"></i> GEMINI LIVE AKTIF (HANDS-FREE)';
+                liveBadge.innerHTML = '<i class="fas fa-circle text-danger fa-beat me-1" style="font-size: 0.55rem;"></i> GEMINI LIVE AKTIF (2 ARAH OTOMATIS)';
             } else {
                 liveBadge.className = 'pro-chip chip-active';
                 liveBadge.innerHTML = '<i class="fas fa-circle text-success me-1" style="font-size: 0.5rem;"></i> Siap Percakapan Live';
@@ -992,7 +1104,7 @@ class VoiceAIPersonalTrainer {
 
         if (subHint) {
             subHint.textContent = active
-                ? 'Percakapan 2 arah otomatis aktif • Anda tidak perlu klik lagi setiap selesai bicara (Ketuk Orb jika ingin memotong pembicaraan Coach)'
+                ? 'Percakapan 2 arah otomatis aktif • Langsung bicara setelah Coach selesai (Ketuk Orb jika ingin memotong pembicaraan Coach)'
                 : 'Klik 1x pada Orb untuk memulai percakapan dua arah otomatis layaknya telepon langsung dengan Personal Trainer';
         }
     }
@@ -1009,11 +1121,17 @@ class VoiceAIPersonalTrainer {
 
         // Hentikan rekaman sementara selama Coach sedang memproses & berbicara agar suara Coach tidak terekam ulang (echo)
         clearTimeout(this.restartTimer);
+        clearTimeout(this.silenceDebounceTimer);
+        this.accumulatedTranscript = '';
+        this.lastInterimTranscript = '';
+
         if (this.recognition && this.isListening) {
             try { this.recognition.stop(); } catch (e) {}
         }
 
         this.isProcessing = true;
+        this.processingStartedAt = Date.now();
+        this.soundEngine.playBeep(540, 0.04); // Umpan balik audio instan bahwa ucapan user sudah diterima
         this.triggerStateChange('thinking');
 
         if (this.callbacks && this.callbacks.onUserMessage) {
@@ -1036,9 +1154,8 @@ class VoiceAIPersonalTrainer {
 
         this.conversationHistory.push({ role: 'user', content: userText });
 
+        let coachReply = '';
         try {
-            let coachReply = '';
-
             // 1. Jika ada Custom Google Gemini API Key pribadi (AIzaSy...) ATAU Embedded Gemini Key (Base64)
             const activeGeminiKey = (!this.isUsingDefaultEmbeddedKey() && this.geminiApiKey.startsWith('AIza'))
                 ? this.geminiApiKey
@@ -1048,60 +1165,48 @@ class VoiceAIPersonalTrainer {
                 try {
                     coachReply = await this.queryGeminiAI(userText, activeGeminiKey);
                 } catch (geminiErr) {
-                    console.warn("Gemini Key gagal, beralih otomatis ke Embedded Cloud AI Engine:", geminiErr);
+                    console.warn("Gemini Key gagal, beralih ke Fast AI Engine:", geminiErr);
                     coachReply = await this.queryEmbeddedCloudAI(userText);
                 }
             } else {
-                // 2. Gunakan Built-in Embedded Cloud AI Engine bawaan aplikasi
+                // 2. Gunakan Fast Embedded Cloud AI (dengan batas waktu ketat 2.6 detik agar selalu responsif!)
                 coachReply = await this.queryEmbeddedCloudAI(userText);
             }
-
-            this.conversationHistory.push({ role: 'assistant', content: coachReply });
-
-            if (this.callbacks && this.callbacks.onCoachReply) {
-                this.callbacks.onCoachReply(coachReply);
-            }
-
-            this.triggerStateChange('speaking');
-            this.voiceCoach.speak(coachReply, () => {
-                this.isProcessing = false;
-                // Pasang Anti-Echo Guard selama 750ms setelah Coach selesai berbicara agar sisa gema speaker tidak masuk ke mic!
-                this.ignoreMicUntil = Date.now() + 750;
-
-                // KUNCI GEMINI LIVE: Begitu Coach selesai berbicara, OTOMATIS kembali mendengarkan user setelah gema hilang!
-                if (this.isLiveSessionActive && !this.isMutedMic) {
-                    this.soundEngine.playBeep(640, 0.05);
-                    this.triggerStateChange('listening');
-                    this.scheduleAutoListen(700);
-                } else {
-                    this.triggerStateChange('idle');
-                }
-            });
-
         } catch (err) {
-            console.error("AI PT Response Error:", err);
-            const fallbackReply = this.queryLocalPTBrain(userText);
-            if (this.callbacks && this.callbacks.onCoachReply) {
-                this.callbacks.onCoachReply(fallbackReply);
-            }
-            this.triggerStateChange('speaking');
-            this.voiceCoach.speak(fallbackReply, () => {
-                this.isProcessing = false;
-                this.ignoreMicUntil = Date.now() + 750;
-                if (this.isLiveSessionActive && !this.isMutedMic) {
-                    this.soundEngine.playBeep(640, 0.05);
-                    this.triggerStateChange('listening');
-                    this.scheduleAutoListen(700);
-                } else {
-                    this.triggerStateChange('idle');
-                }
-            });
+            // 3. Jika Cloud AI sedang antre/limit, langsung jawab instan (<20ms) lewat Contextual Conversational PT Brain!
+            coachReply = this.queryLocalPTBrain(userText);
         }
+
+        if (!coachReply || !coachReply.trim()) {
+            coachReply = this.queryLocalPTBrain(userText);
+        }
+
+        this.conversationHistory.push({ role: 'assistant', content: coachReply });
+
+        if (this.callbacks && this.callbacks.onCoachReply) {
+            this.callbacks.onCoachReply(coachReply);
+        }
+
+        this.triggerStateChange('speaking');
+        this.voiceCoach.speak(coachReply, () => {
+            this.isProcessing = false;
+            this.processingStartedAt = 0;
+            // Pasang Anti-Echo Guard singkat 420ms setelah Coach selesai berbicara agar sisa gema speaker tidak masuk ke mic
+            this.ignoreMicUntil = Date.now() + 420;
+
+            // KUNCI GEMINI LIVE 2 ARAH: Begitu Coach selesai berbicara, OTOMATIS kembali mendengarkan user!
+            if (this.isLiveSessionActive && !this.isMutedMic) {
+                this.soundEngine.playBeep(660, 0.05);
+                this.triggerStateChange('listening');
+                this.scheduleAutoListen(440);
+            } else {
+                this.triggerStateChange('idle');
+            }
+        });
     }
 
     /**
-     * Built-in Embedded Cloud AI Engine (Tanpa Perlu API Key Eksternal!)
-     * Memahami konteks obrolan multi-turn, profil trainee, dan jadwal latihan hari ini sehingga jawaban selalu 100% nyambung!
+     * Built-in Fast Cloud AI Engine (Batas waktu ketat 2.8 detik agar percakapan 2 arah selalu cepat & responsif!)
      */
     async queryEmbeddedCloudAI(userText) {
         const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
@@ -1110,28 +1215,23 @@ class VoiceAIPersonalTrainer {
         const dayData = profile?.programSchedule?.find(d => d.dayNumber === activeDay);
 
         const profileContext = profile
-            ? `Profil Trainee: Level=${profile.level}, Target=${profile.goal}, Alat=${profile.equipment}, Durasi Program=${profile.duration} hari, Hari yang sedang dibuka=Hari ke-${activeDay} (${dayData?.title || 'Latihan Rutin'}).`
+            ? `Profil Trainee: Level=${profile.level}, Target=${profile.goal}, Alat=${profile.equipment}, Durasi=${profile.duration} hari, Hari aktif=Hari ke-${activeDay} (${dayData?.title || 'Latihan Rutin'}).`
             : 'Trainee sedang menggunakan aplikasi Pulse Fit Personal Trainer.';
 
         const systemInstruction =
-            `Kamu adalah ${persona.name}, seorang Personal Trainer & Ahli Nutrisi Fitness profesional di Indonesia (${persona.role}). ` +
+            `Kamu adalah ${persona.name}, Personal Trainer & Ahli Nutrisi Fitness profesional di Indonesia (${persona.role}). ` +
             `${profileContext} ` +
-            `ATURAN PENTING: ` +
-            `1. Kamu sedang mengobrol suara langsung dua arah (Live Voice Call) dengan trainee. ` +
-            `2. Jawablah PERSIS apa yang ditanyakan atau diceritakan oleh trainee secara nyambung, akrab, solutif, dan natural menggunakan Bahasa Indonesia yang baik dan enak didengar (bukan terjemahan kaku). ` +
-            `3. Buat jawabanmu ringkas dan padat (maksimal 2 sampai 3 kalimat saja) agar nyaman didengarkan lewat suara, tanpa simbol bintang markdown atau penomoran. ` +
-            `4. Akhiri dengan pertanyaan pendek yang relevan agar obrolan terus mengalir dua arah!`;
+            `ATURAN: Kamu sedang ngobrol suara 2 arah langsung dengan trainee. Jawablah PERSIS apa yang diucapkan trainee secara nyambung, akrab, dan natural dalam Bahasa Indonesia (maksimal 2 kalimat pendek agar cepat diucapkan). Akhiri dengan pertanyaan singkat agar obrolan mengalir 2 arah!`;
 
         const messages = [
             { role: 'system', content: systemInstruction },
             ...this.conversationHistory.slice(-8)
         ];
 
-        // Provider 1: Pollinations OpenAI Gateway (Sangat cepat ~1.8 detik)
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 7500);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2800);
 
+        try {
             const res = await fetch('https://text.pollinations.ai/openai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1152,109 +1252,143 @@ class VoiceAIPersonalTrainer {
                 if (cleaned) return cleaned;
             }
         } catch (e) {
-            console.info("Primary Embedded Cloud AI busy, switching to Secondary Neural LLM...");
+            clearTimeout(timeoutId);
         }
 
-        // Provider 2: HuggingFace Llama-3.2-3B-Instruct Cloud Space (Bebas Limit 45 Detik!)
-        const historyTranscript = this.conversationHistory
-            .slice(-6)
-            .map(m => `${m.role === 'user' ? 'Trainee' : persona.name}: ${m.content}`)
-            .join('\n');
-
-        const fullPrompt = `${systemInstruction}\n\nRiwayat Percakapan:\n${historyTranscript}\n${persona.name}:`;
-
-        const postRes = await fetch('https://huggingface-projects-llama-3-2-3b-instruct.hf.space/gradio_api/call/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                data: [fullPrompt, 180, 0.7, 0.9, 50, 1.15]
-            })
-        });
-
-        if (!postRes.ok) {
-            throw new Error(`Secondary Cloud LLM HTTP ${postRes.status}`);
-        }
-
-        const { event_id } = await postRes.json();
-        const sseRes = await fetch(`https://huggingface-projects-llama-3-2-3b-instruct.hf.space/gradio_api/call/generate/${event_id}`);
-        const sseText = await sseRes.text();
-
-        const completeMatch = sseText.match(/event:\s*complete\s*\ndata:\s*(\[[\s\S]*?\])\n/);
-        if (completeMatch && completeMatch[1]) {
-            const parsed = JSON.parse(completeMatch[1]);
-            const reply = (parsed[0] || '').replace(/[*#_`~]/g, '').trim();
-            if (reply) return reply;
-        }
-
-        throw new Error('Empty reply from Embedded Cloud AI');
+        // Jika Cloud Gateway sedang sibuk/rate-limit, langsung gunakan Contextual Multi-Turn PT Brain (<20ms, 0 delay!)
+        return this.queryLocalPTBrain(userText);
     }
 
+    /**
+     * Contextual Multi-Turn Indonesian PT Conversational Brain (<20ms Instant Response!)
+     * Membaca riwayat obrolan sebelumnya (this.conversationHistory) dan merespons kalimat pendek maupun panjang secara natural & 2 arah!
+     */
     queryLocalPTBrain(query) {
-        const q = query.toLowerCase();
+        const q = query.toLowerCase().trim();
         const profile = window.appInstance?.profile || null;
         const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
+        const activeDay = window.appInstance?.activeDay || 1;
+        const dayData = profile?.programSchedule?.find(d => d.dayNumber === activeDay);
 
-        if (q.includes('semangat') || q.includes('malas') || q.includes('mager') || q.includes('motivasi') || q.includes('menyerah')) {
-            return `Hei, dengarkan ${persona.name}! Rasa malas atau mager itu musuh terbesar setiap calon juara. Kamu tidak perlu menunggu mood bagus untuk mulai latihan, karena justru perasaan bangga dan hormon endorfin baru akan muncul setelah kamu bergerak lima menit pertama! Ayo ambil posisi sekarang, lakukan satu set saja dulu bersama saya!`;
+        // Ambil ucapan Coach terakhir untuk memahami konteks jika user menjawab pendek ("iya", "boleh", "mau", "gimana", dll.)
+        const prevAssistantMsgs = this.conversationHistory.filter(m => m.role === 'assistant');
+        const lastCoachText = (prevAssistantMsgs[prevAssistantMsgs.length - 1]?.content || '').toLowerCase();
+
+        // 1. Sapaan & Perkenalan
+        if (/^(halo|hai|hei|pagi|siang|sore|malam|assalamualaikum|tes|halo coach|hai coach)\b/.test(q) && q.split(/\s+/).length <= 5) {
+            return `Halo juga Champion! Senang mendengar suaramu bersama ${persona.name}. Hari ini kamu mau fokus bahas jadwal latihan Hari ke-${activeDay}, tips makanan, atau ada bagian otot yang ingin kamu tanyakan?`;
         }
 
-        if (q.includes('jadwal hari ini') || q.includes('latihan apa hari ini') || q.includes('menu latihan')) {
-            const activeDay = window.appInstance?.activeDay || 1;
-            const dayData = profile?.programSchedule?.find(d => d.dayNumber === activeDay);
+        if (q.includes('apa kabar') || q.includes('sehat coach') || q.includes('siapa nama')) {
+            return `Kabar saya luar biasa bugar dan siap penuh mendampingi latihanmu! Saya ${persona.name}, pelatih pribadimu. Gimana kondisi badanmu hari ini, sudah siap berkeringat atau lagi butuh saran menu makan?`;
+        }
+
+        // 2. Respons Kontekstual untuk Jawaban Pendek Dua Arah ("Iya", "Mau", "Boleh", "Siap", "Oke", "Gimana tuh", "Belum")
+        const isShortAffirmative = /^(iya|ya|yap|boleh|mau|mau dong|siap|oke|ok|lanjut|gas|ayo|tentu|betul|benar|bisa|coba|jelaskan|gimana tuh|terus gimana)\b/.test(q) && q.split(/\s+/).length <= 5;
+        if (isShortAffirmative) {
+            if (lastCoachText.includes('stretching') || lastCoachText.includes('peregangan') || lastCoachText.includes('pegal')) {
+                return `Mantap! Sekarang coba berdiri tegak, tarik napas dalam lewat hidung, lalu bungkukkan badan perlahan menyentuh ujung kaki selama 15 detik untuk melemaskan otot paha dan punggungmu. Bagian mana yang terasa paling kaku saat kamu tarik?`;
+            }
+            if (lastCoachText.includes('menu makan') || lastCoachText.includes('nutrisi') || lastCoachText.includes('protein') || lastCoachText.includes('sarapan')) {
+                return `Siap! Untuk hari ini, pastikan setiap kali makan ada sumber protein seukuran telapak tangan seperti dua butir telur ditambah dada ayam atau tempe, satu kepal nasi, dan sayur hijau. Tadi terakhir kamu makan apa?`;
+            }
+            if (lastCoachText.includes('jadwal') || lastCoachText.includes('mulai') || lastCoachText.includes('hari ke')) {
+                const exList = dayData?.exercises ? dayData.exercises.slice(0, 3).map(e => e.name).join(', ') : 'pemanasan sendi, Push-Up, dan Squat';
+                return `Luar biasa semangatmu! Di Hari ke-${activeDay} ini kita akan langsung menghajar gerakan ${exList}. Kamu bisa langsung klik tombol Mulai pada gerakan pertama di layar, atau mau saya jelaskan teknik gerakannya dulu?`;
+            }
+            return `Mantap sekali! Supaya saran ${persona.name} benar-benar pas buat kondisimu sekarang, ceritakan sedikit: hari ini kamu sudah sempat olahraga atau baru mau mulai latihan?`;
+        }
+
+        if (/^(belum|nggak|tidak|enggak|jangan dulu|nanti aja)\b/.test(q) && q.split(/\s+/).length <= 5) {
+            return `Tidak masalah sama sekali! Kita atur sesuai ritme tubuhmu saja agar tetap nyaman dan konsisten. Kalau begitu, ada hal lain yang lagi kamu rasakan di badanmu atau mau bahas tips diet santai dulu?`;
+        }
+
+        // 3. Makanan Spesifik Indonesia (Nasi Padang, Gorengan, Mie, Kopi, Ayam, Telur, dll.)
+        if (q.includes('nasi padang') || q.includes('rendang') || q.includes('santan') || q.includes('gulai')) {
+            return `Makan nasi padang tetap boleh kok asalkan pintar atur porsinya! Trik dari ${persona.name}: minta kuah santannya sedikit saja, pilih lauk tinggi protein seperti ayam bakar atau ayam pop, perbanyak daun singkongnya, dan kurangi porsi nasinya setengah. Nanti sore siap kita bakar kalorinya lewat latihan?`;
+        }
+
+        if (q.includes('gorengan') || q.includes('martabak') || q.includes('bakwan') || q.includes('kerupuk') || q.includes('seblak')) {
+            return `Nah, gorengan dan makanan berminyak itu menyimpan kalori tersembunyi yang cukup tinggi dari tepung dan minyaknya. Kalau sudah terlanjur makan hari ini tidak usah stres, cukup imbangi dengan minum air putih hangat yang banyak dan tambahkan 10 menit kardio seperti Jumping Jacks hari ini. Biasanya kamu paling susah nahan godaan cemilan di jam berapa?`;
+        }
+
+        if (q.includes('mie') || q.includes('indomie') || q.includes('bakso') || q.includes('nasi goreng')) {
+            return `Kalau lagi pengen makan mie atau bakso, kuncinya adalah tambahkan minimal dua butir telur rebus dan sawi hijau yang banyak supaya kebutuhan proteinmu tetap masuk dan tidak cepat lapar lagi. Hari ini kamu sudah makan berapa kali?`;
+        }
+
+        if (q.includes('kopi') || q.includes('teh manis') || q.includes('boba') || q.includes('minuman manis') || q.includes('es ')) {
+            return `Kopi hitam tanpa gula 30 menit sebelum latihan itu justru bagus banget sebagai pembakar lemak dan penambah fokus alami! Yang perlu kita batasi adalah gula cair dari es teh manis atau susu kental manis karena cepat menumpuk jadi lemak perut. Kamu lebih suka kopi hitam atau teh tawar nih?`;
+        }
+
+        // 4. Berat Badan / Tinggi Badan / Angka Spesifik
+        const numMatch = q.match(/(\d{2,3})\s*(kg|kilo|cm|tahun)/i);
+        if (numMatch || q.includes('berat saya') || q.includes('berat badan') || q.includes('tinggi badan')) {
+            const val = numMatch ? parseInt(numMatch[1], 10) : 65;
+            const unit = numMatch ? numMatch[2].toLowerCase() : 'kg';
+            if (unit.includes('kg') || unit.includes('kilo') || q.includes('berat')) {
+                const targetProt = Math.round(val * 1.7);
+                return `Dengan berat sekitar ${val} kilogram, target protein harian idealmu adalah sekitar ${targetProt} gram per hari agar ototmu makin padat dan metabolisme kencang! Kamu juga bisa cek angka kalori detailnya di tab Kalkulator Nutrisi. Target utamamu sekarang mau turun berapa kilo nih?`;
+            }
+            return `Postur tersebut sangat potensial untuk kita bentuk jadi atletis dan proporsional! Kuncinya ada di kombinasi latihan beban teratur dan kecukupan protein harian. Sekarang dalam seminggu kamu biasanya sempat latihan berapa hari?`;
+        }
+
+        // 5. Motivasi, Malas, Capek, Kurang Tidur
+        if (q.includes('semangat') || q.includes('malas') || q.includes('mager') || q.includes('motivasi') || q.includes('menyerah')) {
+            return `Hei, dengarkan ${persona.name}! Rasa mager itu wajar, tapi ingat: kamu tidak perlu menunggu mood bagus untuk mulai, karena hormon endorfin dan rasa bangga justru muncul setelah kamu bergerak lima menit pertama! Ayo mulai dari gerakan paling ringan hari ini, mau kita coba satu set bareng sekarang?`;
+        }
+
+        if (q.includes('capek') || q.includes('lelah') || q.includes('lemas') || q.includes('ngantuk') || q.includes('begadang') || q.includes('kurang tidur')) {
+            return `Kalau tubuhmu sedang sangat lelah atau kurang tidur, jangan dipaksakan latihan berat dengan intensitas maksimal ya. Lebih baik kita lakukan peregangan aktif 10 menit, minum air putih yang cukup, dan tidur lebih awal malam ini supaya ototmu pulih. Tadi malam memangnya kamu tidur berapa jam?`;
+        }
+
+        // 6. Jadwal & Menu Latihan Hari Ini
+        if (q.includes('jadwal') || q.includes('latihan apa') || q.includes('hari ini') || q.includes('gerakan apa')) {
             if (dayData) {
                 if (dayData.isRest) {
-                    return `Hari ke-${activeDay} adalah jadwal Rest and Active Recovery! Tubuhmu sedang memulihkan jaringan otot. Fokus minum air putih 2 liter dan peregangan santai ya!`;
+                    return `Hari ke-${activeDay} ini adalah jadwal Pemulihan Aktif atau Rest Day! Ototmu justru sedang tumbuh saat istirahat, jadi fokuslah minum air putih dua liter dan jalan santai. Bagaimana rasanya ototmu setelah latihan kemarin?`;
                 }
-                const list = dayData.exercises.map(e => e.name).join(', ');
-                return `Jadwal latihanmu pada Hari ke-${activeDay} adalah ${dayData.title}. Kita akan melatih ${dayData.exercises.length} gerakan yaitu: ${list}. Siap kita mulai sekarang?`;
+                const list = dayData.exercises.slice(0, 4).map(e => e.name).join(', ');
+                return `Jadwal latihanmu pada Hari ke-${activeDay} adalah ${dayData.title} dengan ${dayData.exercises.length} gerakan, mulai dari ${list}. Mau langsung kita mulai gerakan pertama sekarang?`;
             }
         }
 
-        if (q.includes('sixpack') || q.includes('perut buncit') || q.includes('lemak perut') || q.includes('abs') || q.includes('buncit')) {
-            return "Untuk memunculkan otot sixpack dan memangkas perut buncit, rahasia utamanya ada dua: pertama, defisit kalori harian sekitar 300 hingga 500 kalori agar lapisan lemak di atas perut menipis. Kedua, latih otot core dengan gerakan di aplikasi ini seperti Plank, Bicycle Crunch, dan Leg Raises untuk menebalkan blok otot perutmu. Kurangi minuman manis dan gorengan, hasilnya akan terlihat jelas dalam 3 sampai 4 minggu!";
+        // 7. Otot Perut, Dada, Lengan, Kaki, Punggung
+        if (q.includes('sixpack') || q.includes('perut') || q.includes('buncit') || q.includes('lemak') || q.includes('abs')) {
+            return `Untuk meratakan perut buncit dan memunculkan garis sixpack, kita gabungkan defisit kalori ringan sekitar 400 kalori per hari dengan latihan otot inti seperti Plank, Bicycle Crunch, dan Leg Raises. Kalau kamu konsisten kurangi gorengan dan minuman manis, dalam 3 minggu lingkar perutmu pasti menyusut! Mau saya pilihkan gerakan perut tercepat sekarang?`;
         }
 
-        if (q.includes('protein') || q.includes('ayam') || q.includes('telur') || q.includes('whey') || q.includes('nutrisi') || q.includes('makan apa') || q.includes('menu')) {
-            return "Target protein harian yang ideal untuk membentuk otot dan membakar lemak adalah 1,6 hingga 2 gram per kilogram berat badanmu. Sumber terbaik yang mudah didapat di Indonesia adalah dada ayam, putih dan kuning telur, ikan tuna atau kembung, tempe, tahu, serta susu tinggi protein. Bagi asupan proteinmu merata di sarapan, makan siang, dan makan malam ya!";
+        if (q.includes('dada') || q.includes('chest') || q.includes('push up') || q.includes('pushup') || q.includes('lengan') || q.includes('tangan') || q.includes('bahu')) {
+            return `Untuk menebalkan otot dada, bahu, dan lengan, variasi Push-Up dan Shoulder Press adalah rajanya! Pastikan saat turun dada mendekati lantai dengan siku membentuk sudut 45 derajat, lalu dorong kuat sambil buang napas. Sekarang sekali set kamu kuat berapa repetisi Push-Up?`;
         }
 
-        if (q.includes('creatine') || q.includes('kreatin') || q.includes('suplemen')) {
-            return "Creatine monohydrate adalah suplemen paling aman dan paling terbukti secara sains! Cukup minum 5 gram setiap hari dengan air putih untuk meningkatkan tenaga eksplosif, mempercepat pemulihan antar set, dan membuat sel otot tampak lebih penuh dan padat.";
+        if (q.includes('kaki') || q.includes('paha') || q.includes('betis') || q.includes('squat') || q.includes('lunge') || q.includes('bokong') || q.includes('glute')) {
+            return `Melatih otot kaki lewat Squat dan Lunges itu membakar kalori paling besar karena kaki adalah grup otot terbesar di tubuh kita! Jaga tumpuan di tumit dan dorong pinggul ke belakang seperti duduk di kursi. Lututmu terasa aman dan nyaman kan saat melakukan Squat?`;
         }
 
-        if (q.includes('kardio') || q.includes('lari') || q.includes('jalan kaki')) {
-            return "Strategi terbaik dari Coach: dahulukan latihan beban atau kalistenik utama saat cadangan glikogen dan tenagamu masih 100 persen penuh! Setelah sesi beban selesai, baru tutup dengan kardio seperti jalan cepat atau lari ringan 15 sampai 20 menit untuk memaksimalkan pembakaran cadangan lemak.";
+        // 8. Nutrisi, Protein, Diet, Bulking, Suplemen
+        if (q.includes('protein') || q.includes('ayam') || q.includes('telur') || q.includes('nutrisi') || q.includes('makan') || q.includes('sarapan') || q.includes('malam')) {
+            return `Aturan nutrisi praktis dari ${persona.name}: pastikan setiap piring makanmu punya sumber protein utama seperti telur, dada ayam, ikan, tahu, atau tempe, ditambah sayur dan karbohidrat secukupnya. Kamu biasanya lebih suka sarapan apa di pagi hari?`;
         }
 
-        if (q.includes('pegal') || q.includes('doms') || q.includes('sakit badan') || q.includes('linu') || q.includes('nyeri otot')) {
-            return "Rasa pegal 1 sampai 2 hari setelah latihan itu disebut DOMS, tanda bahwa serat ototmu sedang merespons stimulus latihan dan tumbuh lebih kuat! Jangan khawatir, tetaplah bergerak ringan, minum air putih lebih banyak, makan cukup protein, dan tidur minimal 7 jam malam ini.";
+        if (q.includes('creatine') || q.includes('kreatin') || q.includes('suplemen') || q.includes('whey') || q.includes('susu')) {
+            return `Suplemen seperti Whey Protein dan Creatine 5 gram per hari itu sangat membantu mempercepat pemulihan dan menambah tenaga otot, tapi makanan utuh sehari-hari tetap nomor satu! Saat ini kamu sudah rutin pakai suplemen atau masih fokus dari makanan alami?`;
         }
 
-        if (q.includes('push up') || q.includes('pushup') || q.includes('tangan gemetar') || q.includes('belum kuat')) {
-            return "Sangat wajar untuk pemula! Jika push-up penuh di lantai masih berat, modifikasi dengan menaruh kedua tangan di tepi meja kokoh atau sofa (Incline Push-up), atau gunakan tumpuan lutut di matras (Knee Push-up). Jaga punggung tetap lurus, lakukan rutin, dalam dua minggu kekuatan dorong dadamu pasti meningkat drastis!";
+        if (q.includes('pegal') || q.includes('doms') || q.includes('sakit') || q.includes('linu') || q.includes('nyeri') || q.includes('cedera') || q.includes('lutut') || q.includes('pinggang')) {
+            return `Rasa pegal otot setelah latihan itu wajar tanda serat otot sedang beradaptasi, tapi kalau nyerinya tajam di sendi seperti lutut atau pinggang, kita wajib kurangi bebannya dan ganti dengan gerakan yang aman! Bagian mana yang sekarang paling terasa pegal atau kurang nyaman?`;
         }
 
-        if (q.includes('lutut') || q.includes('sendi') || q.includes('sakit pas squat') || q.includes('cedera')) {
-            return "Keamanan sendi adalah prioritas utama! Jika lutut terasa kurang nyaman saat squat, pastikan kamu mendorong bokong ke belakang terlebih dahulu seperti hendak duduk di kursi, tumpukan berat di tumit, dan buka lutut searah ujung jari kaki. Hindari gerakan melompat sementara waktu dan ganti dengan Glute Bridge yang sangat aman bagi lutut!";
+        if (q.includes('kardio') || q.includes('lari') || q.includes('jalan') || q.includes('kalori') || q.includes('keringat')) {
+            return `Strategi terbaik adalah dahulukan latihan gerakan otot utama selama 15 sampai 20 menit saat tenagamu masih penuh, lalu tutup dengan kardio untuk menguras sisa lemak! Kamu lebih suka kardio di dalam ruangan seperti HIIT atau lari di luar ruangan?`;
         }
 
-        if (q.includes('pagi') || q.includes('malam') || q.includes('sore') || q.includes('waktu terbaik') || q.includes('jam berapa')) {
-            return "Secara fisiologis, kekuatan otot dan suhu tubuh berada di puncaknya pada sore hari sekitar pukul 4 hingga 6 sore. Namun, latihan pagi hari juga luar biasa untuk mendongkrak metabolisme dan mood seharian. Jika berlatih malam hari, selesaikan minimal 1,5 jam sebelum jam tidur agar detak jantungmu sempat turun dan tidurmu tetap nyenyak!";
+        if (q.includes('turun') || q.includes('diet') || q.includes('defisit') || q.includes('kurus') || q.includes('langsing') || q.includes('naik') || q.includes('bulking') || q.includes('gemuk')) {
+            return `Baik untuk menurunkan lemak maupun menaikkan massa otot, kunci utamanya ada pada konsistensi latihan 4 kali seminggu dan mengatur porsi protein harianmu. Menurutmu pribadi, tantangan terbesarmu selama ini ada di mengatur pola makan atau menjaga jadwal latihan?`;
         }
 
-        if (q.includes('napas') || q.includes('nafas') || q.includes('ngos')) {
-            return "Aturan emas pernapasan biomekanik: tarik napas lewat hidung pada fase menurunkan beban atau saat otot memanjang (fase eksentrik), dan hembuskan napas kuat lewat mulut saat kamu mendorong atau mengangkat beban (fase konsentrik). Jangan pernah menahan napas terlalu lama agar tekanan darah tetap stabil!";
-        }
-
-        if (q.includes('turun berat') || q.includes('diet') || q.includes('defisit') || q.includes('kurus') || q.includes('langsing')) {
-            return "Kunci sukses menurunkan berat badan tanpa lemas adalah defisit kalori moderat sekitar 400 kalori di bawah TDEE harianmu. Gunakan tab Kalkulator Nutrisi di aplikasi ini untuk menghitung angka pastinya, perbanyak makan protein dan serat sayur agar kenyang lebih lama, serta tuntaskan jadwal latihan harianmu!";
-        }
-
-        if (q.includes('bulking') || q.includes('naik berat') || q.includes('gemuk') || q.includes('otot besar') || q.includes('kurus banget')) {
-            return "Untuk menambah massa otot yang bersih (Lean Bulking), kamu butuh surplus sekitar 300 kalori di atas kebutuhan harianmu dan tidur yang berkualitas. Fokus pada latihan progresif: tambah jumlah repetisi atau perlambat tempo turun gerakanmu agar tegangan otot makin maksimal!";
-        }
-
-        return `Pertanyaan yang bagus! Sebagai Personal Trainer-mu, ${persona.name} menyarankan tiga pilar utama untuk menjawab hal tersebut: pertama, jaga kualitas teknik dan tempo di setiap repetisi; kedua, pastikan kebutuhan protein harian serta hidrasi 2 liter air terpenuhi; dan ketiga, konsisten ikuti kurikulum latihan yang sudah kita susun. Mau kita bahas lebih spesifik soal latihan hari ini atau menu makanmu?`;
+        // 9. Respons Kontekstual Dinamis untuk Topik Obrolan Bebas Apa Saja (Selalu Nyambung & Mengajak Ngobrol Balik!)
+        const shortTopic = query.length > 55 ? query.slice(0, 55) + '...' : query;
+        return `Menarik sekali yang kamu sampaikan soal "${shortTopic}"! Dari sudut pandang ${persona.name}, hal itu sangat berkaitan dengan bagaimana kita mengatur keseimbangan antara latihan rutin, pola makan berprotein, dan istirahat yang berkualitas. Kalau boleh tahu, apa target utama yang paling ingin kamu capai minggu ini supaya saya bisa bantu arahkan langkahnya?`;
     }
 
     async queryGeminiAI(userText, overrideKey = null) {
