@@ -20,6 +20,10 @@ class WorkoutApp {
         this.profile = this.loadTraineeProfile();
         this.activeDay = 1;
         this.activeCategoryFilter = 'all';
+        this.activeEquipmentFilter = 'all';
+        this.exerciseSearchQuery = '';
+        this.selectedMuscleZone = 'abs';
+        this.lastMealPlanSpeech = '';
 
         this.init();
     }
@@ -135,13 +139,34 @@ class WorkoutApp {
 
         // Filter Katalog Gerakan
         document.querySelectorAll('[data-exercise-filter]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', () => {
                 document.querySelectorAll('[data-exercise-filter]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.activeCategoryFilter = btn.getAttribute('data-exercise-filter');
                 this.renderExerciseLibrary();
             });
         });
+
+        const searchInput = document.getElementById('exerciseSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.exerciseSearchQuery = (e.target.value || '').trim().toLowerCase();
+                this.renderExerciseLibrary();
+            });
+        }
+
+        const equipSelect = document.getElementById('exerciseEquipmentFilter');
+        if (equipSelect) {
+            equipSelect.addEventListener('change', (e) => {
+                this.activeEquipmentFilter = e.target.value || 'all';
+                this.renderExerciseLibrary();
+            });
+        }
+
+        const btnSaveBodyLog = document.getElementById('btnSaveBodyLog');
+        if (btnSaveBodyLog) {
+            btnSaveBodyLog.addEventListener('click', () => this.saveBodyMetricsLog());
+        }
 
         // Setup Multi-Step Onboarding Wizard
         this.setupOnboardingEvents();
@@ -390,15 +415,22 @@ class WorkoutApp {
         document.querySelectorAll('[data-app-tab]').forEach(b => b.classList.remove('active'));
 
         const targetPanel = document.getElementById(`tab-${tabId}`);
-        const targetBtn = document.querySelector(`[data-app-tab="${tabId}"]`);
+        document.querySelectorAll(`[data-app-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
 
         if (targetPanel) targetPanel.classList.remove('d-none');
-        if (targetBtn) targetBtn.classList.add('active');
+
+        const fab = document.querySelector('.floating-coach-fab-group');
+        if (fab) {
+            if (tabId === 'voice-ai') fab.classList.add('d-none');
+            else fab.classList.remove('d-none');
+        }
 
         if (tabId === 'exercises') {
             this.renderExerciseLibrary();
         } else if (tabId === 'routine') {
             this.renderDailyRoutineView();
+        } else if (tabId === 'progress') {
+            this.renderProgressAndAnatomyTab();
         }
     }
 
@@ -736,6 +768,7 @@ class WorkoutApp {
         this.renderExerciseLibrary();
         this.renderHydrationTracker();
         this.renderWorkoutStats();
+        this.renderProgressAndAnatomyTab();
     }
 
     renderDailyRoutineView() {
@@ -822,6 +855,9 @@ class WorkoutApp {
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2 ms-auto">
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" title="Ganti dengan variasi gerakan lain" onclick="window.appInstance.swapRoutineExercise(${idx})">
+                                <i class="fas fa-shuffle"></i>
+                            </button>
                             <button class="btn btn-pro-secondary btn-sm" onclick="window.appInstance.openExerciseDetailModal('${ex.id}')">
                                 <i class="fas fa-eye me-1"></i> Detail Form
                             </button>
@@ -917,6 +953,83 @@ class WorkoutApp {
         this.player.startSingleExerciseSession(exerciseId, mode, 3);
     }
 
+    /**
+     * FITUR PRO 1: Sesi Latihan Kilat 1-Klik (Express Workouts)
+     */
+    startExpressWorkout(type = 'hiit7') {
+        const all = Object.values(window.EXERCISE_DATABASE || {});
+        if (all.length === 0) return;
+
+        let title = 'Express Workout';
+        let selectedIds = [];
+        let mode = 'time';
+
+        if (type === 'warmup') {
+            title = 'Express: Pemanasan & Mobilitas Sendi (5 Menit)';
+            selectedIds = ['jumping_jacks', 'bodyweight_squat', 'glute_bridge', 'incline_pushup'];
+            mode = 'time';
+        } else if (type === 'hiit7') {
+            title = 'Express: Tabata HIIT Pembakar Lemak (7 Menit)';
+            selectedIds = ['jumping_jacks', 'high_knees', 'mountain_climbers', 'burpees', 'jumping_squats'];
+            mode = 'time';
+        } else if (type === 'abs5') {
+            title = 'Express: Sixpack Core Blaster (6 Menit)';
+            selectedIds = ['plank_hold', 'bicycle_crunches', 'leg_raises', 'russian_twists', 'mountain_climbers'];
+            mode = 'reps';
+        } else if (type === 'chest5') {
+            title = 'Express: Upper Body Dada & Lengan (6 Menit)';
+            selectedIds = ['standard_pushup', 'incline_pushup', 'diamond_pushup', 'tricep_dips'];
+            mode = 'reps';
+        }
+
+        const exercises = selectedIds
+            .map(id => window.EXERCISE_DATABASE[id])
+            .filter(Boolean)
+            .map(ex => ({
+                ...ex,
+                duration: type === 'warmup' ? 30 : 35,
+                defaultReps: ex.defaultReps || 12
+            }));
+
+        if (exercises.length === 0) {
+            exercises.push(...all.slice(0, 4).map(ex => ({ ...ex, duration: 35 })));
+        }
+
+        this.player.startWorkout(exercises, title, {
+            initialMode: mode,
+            startIndex: 0
+        });
+    }
+
+    /**
+     * FITUR PRO 2: Ganti / Swap Gerakan Harian dengan 1 Klik
+     */
+    swapRoutineExercise(index) {
+        const schedule = this.profile?.programSchedule;
+        const currentDayData = schedule?.find(d => d.dayNumber === this.activeDay);
+        if (!currentDayData || !currentDayData.exercises || !currentDayData.exercises[index]) return;
+
+        const currentEx = currentDayData.exercises[index];
+        const currentIds = new Set(currentDayData.exercises.map(e => e.id));
+        const all = Object.values(window.EXERCISE_DATABASE || {});
+
+        let candidates = all.filter(e => e.category === currentEx.category && !currentIds.has(e.id));
+        if (candidates.length === 0) {
+            candidates = all.filter(e => !currentIds.has(e.id));
+        }
+        if (candidates.length === 0) return;
+
+        const replacement = candidates[Math.floor(Math.random() * candidates.length)];
+        currentDayData.exercises[index] = {
+            ...replacement,
+            duration: currentEx.duration || replacement.defaultDuration || 40
+        };
+
+        this.saveTraineeProfile(this.profile);
+        this.soundEngine.playBeep(680, 0.06);
+        this.renderDailyRoutineView();
+    }
+
     handleWorkoutCompleted(result) {
         if (!this.profile) return;
 
@@ -999,23 +1112,52 @@ class WorkoutApp {
         let filtered = all;
 
         if (this.activeCategoryFilter !== 'all') {
-            filtered = all.filter(ex => ex.category === this.activeCategoryFilter);
+            filtered = filtered.filter(ex => ex.category === this.activeCategoryFilter);
+        }
+
+        if (this.activeEquipmentFilter && this.activeEquipmentFilter !== 'all') {
+            filtered = filtered.filter(ex => (ex.equipment || 'none') === this.activeEquipmentFilter);
+        }
+
+        if (this.exerciseSearchQuery) {
+            const q = this.exerciseSearchQuery;
+            filtered = filtered.filter(ex => {
+                const nameMatch = (ex.name || '').toLowerCase().includes(q) || (ex.englishName || '').toLowerCase().includes(q);
+                const muscleMatch = (ex.targetMuscles?.primary || []).join(' ').toLowerCase().includes(q) ||
+                                    (ex.targetMuscles?.secondary || []).join(' ').toLowerCase().includes(q);
+                return nameMatch || muscleMatch || (ex.category || '').toLowerCase().includes(q);
+            });
+        }
+
+        if (filtered.length === 0) {
+            grid.innerHTML = `
+                <div class="col-12">
+                    <div class="pro-card p-5 text-center">
+                        <i class="fas fa-dumbbell fa-2x text-muted mb-3"></i>
+                        <h5 class="text-white fw-bold">Gerakan Tidak Ditemukan</h5>
+                        <p class="text-secondary small mb-0">Coba gunakan kata kunci pencarian lain atau pilih kategori "Semua Gerakan".</p>
+                    </div>
+                </div>
+            `;
+            return;
         }
 
         grid.innerHTML = filtered.map(ex => {
             const primaryMuscle = ex.targetMuscles?.primary?.join(', ') || 'Semua Otot';
             const isStaticPlank = ex.svgType === 'plank';
+            const equipBadge = ex.equipment === 'dumbbell' ? '🏋️ Dumbbell' : '🤸 Bodyweight';
             return `
                 <div class="col-md-6 col-lg-4">
                     <div class="pro-card pro-card-hover h-100 overflow-hidden d-flex flex-column justify-content-between">
-                        <div class="p-3 bg-black bg-opacity-40 text-center border-bottom border-secondary border-opacity-15">
+                        <div class="p-3 bg-black bg-opacity-40 text-center border-bottom border-secondary border-opacity-15 position-relative">
+                            <span class="badge bg-dark border border-secondary border-opacity-50 text-secondary position-absolute top-0 end-0 m-2" style="font-size: 0.68rem;">${equipBadge}</span>
                             ${window.getExerciseAnimationSvg ? window.getExerciseAnimationSvg(ex.svgType, false) : ''}
                         </div>
                         <div class="p-4 d-flex flex-column justify-content-between flex-grow-1">
                             <div>
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <span class="pro-chip chip-active" style="font-size: 0.72rem; padding: 0.2rem 0.6rem;">${ex.category.toUpperCase()}</span>
-                                    <span class="text-secondary small font-monospace">${ex.defaultDuration || 40}s • ${ex.defaultReps || 12} Rep</span>
+                                    <span class="text-secondary small font-monospace">${ex.defaultDuration || 40}s • ${ex.defaultReps || 12} Rep • ~28 kkal</span>
                                 </div>
                                 <h5 class="text-white fw-bold mb-1" style="font-size: 1.05rem;">${ex.name}</h5>
                                 <p class="small text-secondary mb-2">${ex.englishName}</p>
@@ -1165,9 +1307,67 @@ class WorkoutApp {
             document.getElementById('resCarbs').innerText = `${carbsGrams}g (${carbsCal} kkal)`;
             document.getElementById('resFat').innerText = `${fatGrams}g (${Math.round(fatCal)} kkal)`;
         }
+
+        // Render Rekomendasi Jadwal Menu Makan Harian Indonesia
+        this.renderIndonesianMealPlan(goal, targetCalories, proteinGrams, carbsGrams);
     }
 
-    // === HYDRATION TRACKER ===
+    renderIndonesianMealPlan(goal, targetCalories, proteinGrams, carbsGrams) {
+        const container = document.getElementById('resIndonesianMealPlan');
+        if (!container) return;
+
+        const pPerMeal = Math.round(proteinGrams / 3.5);
+        let meals = [];
+
+        if (goal === 'cut') {
+            meals = [
+                { time: '🌅 Sarapan Pagi (07:00)', title: '3 Putih + 1 Kuning Telur Rebus & Oatmeal Pisang', macros: `~${pPerMeal}g Protein • 380 kkal`, desc: 'Kenyang lebih lama dan menjaga gula darah stabil di pagi hari.' },
+                { time: '☀️ Makan Siang (12:30)', title: '150g Dada Ayam Bakar/Panggang + 1 Kepal Nasi Merah/Putih + Lalapan Sayur', macros: `~${pPerMeal + 12}g Protein • 520 kkal`, desc: 'Hindari kuah bersantan kental dan kulit ayam goreng tepung.' },
+                { time: '⚡ Snack Sebelum Latihan (16:00)', title: 'Kopi Hitam Tanpa Gula + 1 Buah Apel / 2 Keping Tempe Kukus', macros: `~10g Protein • 160 kkal`, desc: 'Mendongkrak fokus dan pembakaran lemak saat sesi latihan sore.' },
+                { time: '🌙 Makan Malam (19:00)', title: 'Ikan Bakar / Pepes Ikan / Tahu Tempe Bacem Tanpa Minyak + Tumis Brokoli', macros: `~${pPerMeal + 5}g Protein • 430 kkal`, desc: 'Tinggi protein dan serat untuk pemulihan otot saat tidur tanpa menumpuk lemak.' }
+            ];
+        } else if (goal === 'bulk') {
+            meals = [
+                { time: '🌅 Sarapan Pagi (07:00)', title: '3 Telur Dadar + 2 Lembar Roti Gandum Selai Kacang + Susu Tinggi Protein', macros: `~${pPerMeal + 5}g Protein • 640 kkal`, desc: 'Surplus energi bersih untuk memulai sintesis protein pagi hari.' },
+                { time: '☀️ Makan Siang (12:30)', title: '180g Dada Ayam / Daging Sapi Tanpa Lemak + 1,5 Porsi Nasi Putih + Sayur Bayam', macros: `~${pPerMeal + 15}g Protein • 760 kkal`, desc: 'Karbohidrat kompleks mengisi penuh glikogen otot agar angkatan makin kuat.' },
+                { time: '⚡ Post-Workout Shake/Snack (16:30)', title: '2 Buah Pisang + Susu Whey / Kedelai + 3 Potong Tempe', macros: `~24g Protein • 420 kkal`, desc: 'Langsung memperbaiki serat otot yang bekerja keras setelah latihan.' },
+                { time: '🌙 Makan Malam (19:30)', title: 'Ikan Tuna / Ayam Panggang + Kentang Rebus / Nasi + Capcay Sayur', macros: `~${pPerMeal + 8}g Protein • 650 kkal`, desc: 'Menjaga tubuh tetap anabolik sepanjang malam.' }
+            ];
+        } else {
+            meals = [
+                { time: '🌅 Sarapan Pagi (07:00)', title: '2 Butir Telur Orak-Arik + Bubur Oatmeal / Nasi Uduk Porsi Kecil Tanpa Gorengan', macros: `~${pPerMeal}g Protein • 450 kkal`, desc: 'Komposisi seimbang untuk stamina kerja dan latihan harian.' },
+                { time: '☀️ Makan Siang (12:30)', title: '150g Ayam Panggang / Ikan Kembung + Nasi Secukupnya + Sayur Asem', macros: `~${pPerMeal + 10}g Protein • 580 kkal`, desc: 'Sumber protein lokal berkualitas tinggi dengan mikronutrisi lengkap.' },
+                { time: '⚡ Camilan Sore (16:00)', title: 'Edamame Rebus / Kacang Almond + Buah Pepaya atau Pisang', macros: `~12g Protein • 210 kkal`, desc: 'Menjaga energi sore hari sebelum berolahraga.' },
+                { time: '🌙 Makan Malam (19:00)', title: 'Sup Tahu Ayam + Tempe Panggang + Tumis Kangkung', macros: `~${pPerMeal + 4}g Protein • 480 kkal`, desc: 'Ringan di pencernaan namun kaya asam amino pemulih otot.' }
+            ];
+        }
+
+        this.lastMealPlanSpeech = `Berdasarkan perhitungan tubuhmu, target kalorimu adalah ${targetCalories} kalori dengan ${proteinGrams} gram protein per hari. Untuk sarapan pagi, konsumsi ${meals[0].title}. Untuk makan siang, pilih ${meals[1].title}. Sore hari sebelum latihan, nikmati ${meals[2].title}. Dan untuk makan malam, tutup dengan ${meals[3].title}.`;
+
+        container.innerHTML = meals.map(m => `
+            <div class="col-md-6">
+                <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-warning small fw-bold">${m.time}</span>
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 font-monospace" style="font-size: 0.7rem;">${m.macros}</span>
+                    </div>
+                    <h6 class="text-white fw-bold mb-1" style="font-size: 0.92rem;">${m.title}</h6>
+                    <p class="text-secondary small mb-0" style="font-size: 0.78rem;">${m.desc}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    speakCustomMealPlan() {
+        if (this.lastMealPlanSpeech) {
+            this.voiceCoach.speak(this.lastMealPlanSpeech);
+        } else {
+            this.calculateNutritionMacros();
+            if (this.lastMealPlanSpeech) this.voiceCoach.speak(this.lastMealPlanSpeech);
+        }
+    }
+
+    // === HYDRATION TRACKER (INTERACTIVE 8 GLASSES) ===
     renderHydrationTracker() {
         const todayStr = new Date().toISOString().split('T')[0];
         let waterData = JSON.parse(localStorage.getItem('workout_water_intake') || '{}');
@@ -1184,10 +1384,36 @@ class WorkoutApp {
         const bar = document.getElementById('waterProgressBar');
         const text = document.getElementById('waterProgressText');
         const mlText = document.getElementById('waterVolumeText');
+        const cupsGrid = document.getElementById('waterGlassesInteractiveGrid');
 
         if (bar) bar.style.width = `${pct}%`;
         if (text) text.innerText = `${count} / ${total} Gelas`;
-        if (mlText) mlText.innerText = `${count * 250} ml / 2000 ml`;
+        if (mlText) mlText.innerText = `(${count * 250} ml / 2000 ml)`;
+
+        if (cupsGrid) {
+            let cupsHtml = '';
+            for (let i = 1; i <= total; i++) {
+                const isFilled = i <= count;
+                cupsHtml += `
+                    <button type="button" class="water-cup-btn ${isFilled ? 'filled' : ''}" onclick="window.appInstance.setWaterGlassCount(${i})" title="Gelas ke-${i} (${i * 250} ml)">
+                        <i class="fas fa-glass-water"></i>
+                    </button>
+                `;
+            }
+            cupsGrid.innerHTML = cupsHtml;
+        }
+    }
+
+    setWaterGlassCount(targetCount) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        localStorage.setItem('workout_water_intake', JSON.stringify({ date: todayStr, count: targetCount }));
+        this.soundEngine.playBeep(720, 0.07);
+        this.renderHydrationTracker();
+        this.renderProgressAndAnatomyTab();
+
+        if (targetCount === 8) {
+            this.voiceCoach.speak("Luar biasa! Target hidrasi delapan gelas air putih hari ini sudah terpenuhi seratus persen. Metabolisme dan pemulihan ototmu akan bekerja sangat optimal!");
+        }
     }
 
     addWaterGlass() {
@@ -1196,9 +1422,7 @@ class WorkoutApp {
         if (waterData.date !== todayStr) waterData = { date: todayStr, count: 0 };
 
         waterData.count = (waterData.count || 0) + 1;
-        localStorage.setItem('workout_water_intake', JSON.stringify(waterData));
-        this.soundEngine.playBeep(700, 0.08);
-        this.renderHydrationTracker();
+        this.setWaterGlassCount(waterData.count);
     }
 
     resetWaterIntake() {
@@ -1213,13 +1437,224 @@ class WorkoutApp {
         const totalProgramDays = this.profile.duration || 30;
         const pct = Math.round((completedCount / totalProgramDays) * 100);
 
+        const history = this.profile.workoutHistory || [];
+        const historyCalories = history.reduce((acc, item) => acc + (item.calories || 0), 0);
+        const totalCalories = Math.max(historyCalories, completedCount * 145);
+
+        // Hitung Level XP & Rank Athlete
+        const xpPoints = (completedCount * 150) + Math.round(totalCalories * 0.5);
+        const level = Math.max(1, Math.floor(xpPoints / 200) + 1);
+        let rankTitle = 'Rookie Starter';
+        if (level >= 10) rankTitle = 'Spartan Legend';
+        else if (level >= 7) rankTitle = 'Elite Titan';
+        else if (level >= 4) rankTitle = 'Pro Gladiator';
+        else if (level >= 2) rankTitle = 'Active Warrior';
+
         const streakEl = document.getElementById('statStreakDays');
         const pctEl = document.getElementById('statProgressPercent');
         const progressEl = document.getElementById('statTotalProgressBar');
+        const calEl = document.getElementById('statTotalCalories');
+        const lvlEl = document.getElementById('statAthleteLevel');
+        const rankSubEl = document.getElementById('statAthleteRankSub');
+        const navRankEl = document.getElementById('navbarAthleteRankBadge');
 
         if (streakEl) streakEl.innerText = `${completedCount} Hari`;
         if (pctEl) pctEl.innerText = `${pct}%`;
         if (progressEl) progressEl.style.width = `${pct}%`;
+        if (calEl) calEl.innerText = `${totalCalories} kkal`;
+        if (lvlEl) lvlEl.innerText = `Lv. ${level}`;
+        if (rankSubEl) rankSubEl.innerText = rankTitle;
+        if (navRankEl) navRankEl.innerText = `⚡ Lv.${level} ${rankTitle}`;
+    }
+
+    // === TAB PROGRES, PETA OTOT ANATOMI & PENCAPAIAN ===
+    renderProgressAndAnatomyTab() {
+        this.selectMuscleZone(this.selectedMuscleZone || 'abs', 'Otot Perut Sixpack & Core', false);
+        this.renderBodyMetricsChart();
+        this.renderAchievements();
+        this.renderWorkoutHistoryList();
+    }
+
+    selectMuscleZone(zoneKey, zoneTitle, speakFeedback = true) {
+        this.selectedMuscleZone = zoneKey;
+        const panel = document.getElementById('selectedMuscleZonePanel');
+        if (!panel) return;
+
+        // Highlight active SVG group
+        document.querySelectorAll('.body-muscle-zone .muscle-part').forEach(el => {
+            el.classList.remove('active-zone');
+        });
+        document.querySelectorAll(`.body-muscle-zone[data-muscle-zone="${zoneKey}"] .muscle-part`).forEach(el => {
+            el.classList.add('active-zone');
+        });
+
+        const all = Object.values(window.EXERCISE_DATABASE || {});
+        const matched = all.filter(e => e.category === zoneKey);
+
+        panel.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-success fw-bold mb-0"><i class="fas fa-crosshairs me-1"></i> ${zoneTitle}</h6>
+                <span class="badge bg-dark border border-secondary border-opacity-50">${matched.length} Gerakan</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                ${matched.slice(0, 4).map(ex => `
+                    <div class="d-flex align-items-center justify-content-between p-2 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-15">
+                        <div>
+                            <div class="text-white small fw-bold">${ex.name}</div>
+                            <div class="text-muted" style="font-size: 0.72rem;">${ex.defaultReps || 12} Rep • ${ex.defaultDuration || 40}s</div>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1 small" onclick="window.appInstance.openExerciseDetailModal('${ex.id}')">Form</button>
+                            <button class="btn btn-xs btn-success rounded-pill px-3 py-1 small fw-bold text-dark" onclick="window.appInstance.startSingleExercise('${ex.id}', '${ex.svgType === 'plank' ? 'time' : 'reps'}')">
+                                <i class="fas fa-play me-1"></i> Mulai
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        if (speakFeedback && this.soundEngine) {
+            this.soundEngine.playBeep(640, 0.05);
+        }
+    }
+
+    saveBodyMetricsLog() {
+        const wInput = document.getElementById('inputTrackWeight');
+        const waistInput = document.getElementById('inputTrackWaist');
+        const weight = parseFloat(wInput?.value || '0');
+        const waist = parseFloat(waistInput?.value || '0');
+
+        if (!weight || weight < 25 || weight > 250) {
+            alert("Masukkan berat badan yang valid (dalam kg).");
+            return;
+        }
+
+        const logs = JSON.parse(localStorage.getItem('workout_body_logs') || '[]');
+        logs.push({
+            date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+            weight,
+            waist: waist || null,
+            ts: Date.now()
+        });
+
+        localStorage.setItem('workout_body_logs', JSON.stringify(logs.slice(-12)));
+        if (this.soundEngine) this.soundEngine.playChime();
+        this.renderBodyMetricsChart();
+        this.voiceCoach.speak(`Progres fisik berhasil dicatat! Berat badanmu saat ini ${weight} kilogram. Terus jaga konsistensi latihan dan nutrisimu!`);
+    }
+
+    renderBodyMetricsChart() {
+        const container = document.getElementById('bodyWeightChartContainer');
+        const bmiBadge = document.getElementById('bmiStatusBadge');
+        if (!container) return;
+
+        let logs = JSON.parse(localStorage.getItem('workout_body_logs') || '[]');
+        if (logs.length === 0) {
+            logs = [
+                { date: 'Awal', weight: 70.0, waist: 84 },
+                { date: 'Minggu 1', weight: 69.2, waist: 83 },
+                { date: 'Hari Ini', weight: 68.5, waist: 81.5 }
+            ];
+        }
+
+        const latest = logs[logs.length - 1];
+        const heightM = 1.70;
+        const bmi = (latest.weight / (heightM * heightM)).toFixed(1);
+        let bmiLabel = 'Ideal / Atletis';
+        if (bmi < 18.5) bmiLabel = 'Underweight';
+        else if (bmi >= 25) bmiLabel = 'Overweight (Fokus Fat Loss)';
+
+        if (bmiBadge) {
+            bmiBadge.innerHTML = `<i class="fas fa-heart-pulse me-1"></i> Berat: <strong>${latest.weight} kg</strong> • BMI: <strong>${bmi}</strong> (${bmiLabel})`;
+        }
+
+        const weights = logs.map(l => l.weight);
+        const minW = Math.min(...weights) - 1.5;
+        const maxW = Math.max(...weights) + 1.5;
+        const width = 460;
+        const height = 135;
+
+        const points = logs.map((item, idx) => {
+            const x = logs.length === 1 ? width / 2 : 35 + (idx / (logs.length - 1)) * (width - 70);
+            const y = height - 28 - ((item.weight - minW) / Math.max(1, maxW - minW)) * (height - 55);
+            return { x, y, ...item };
+        });
+
+        const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+
+        container.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: 135px;">
+                <line x1="25" y1="${height - 24}" x2="${width - 25}" y2="${height - 24}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                <polyline fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${polylinePoints}"/>
+                ${points.map(p => `
+                    <circle cx="${p.x}" cy="${p.y}" r="5" fill="#10b981" stroke="#090a0f" stroke-width="2"/>
+                    <text x="${p.x}" y="${p.y - 10}" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">${p.weight}kg</text>
+                    <text x="${p.x}" y="${height - 8}" fill="#94a3b8" font-size="10" text-anchor="middle">${p.date}</text>
+                `).join('')}
+            </svg>
+        `;
+    }
+
+    renderAchievements() {
+        const grid = document.getElementById('achievementsGrid');
+        if (!grid) return;
+
+        const completedDays = this.profile?.completedDays?.length || 0;
+        const historyCount = this.profile?.workoutHistory?.length || 0;
+        const waterData = JSON.parse(localStorage.getItem('workout_water_intake') || '{}');
+        const waterCount = waterData.count || 0;
+
+        const badges = [
+            { title: 'Langkah Pertama', desc: 'Menyelesaikan sesi latihan perdana', icon: 'fa-Shoe-prints', unlocked: completedDays >= 1 || historyCount >= 1 },
+            { title: '3-Day Fire Streak', desc: 'Konsisten berlatih 3 hari program', icon: 'fa-fire', unlocked: completedDays >= 3 },
+            { title: 'Master Hidrasi', desc: 'Minum minimal 4 gelas air hari ini', icon: 'fa-glass-water', unlocked: waterCount >= 4 },
+            { title: 'Spartan 7 Hari', desc: 'Menuntaskan 7 hari jadwal latihan', icon: 'fa-shield-halved', unlocked: completedDays >= 7 }
+        ];
+
+        grid.innerHTML = badges.map(b => `
+            <div class="col-sm-6">
+                <div class="achievement-card ${b.unlocked ? 'unlocked' : ''}">
+                    <div class="achievement-icon-box">
+                        <i class="fas ${b.icon}"></i>
+                    </div>
+                    <div>
+                        <div class="text-white fw-bold small">${b.title} ${b.unlocked ? '<i class="fas fa-check-circle text-success ms-1"></i>' : ''}</div>
+                        <div class="text-secondary" style="font-size: 0.74rem;">${b.desc}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    renderWorkoutHistoryList() {
+        const container = document.getElementById('workoutHistoryList');
+        if (!container) return;
+
+        const history = (this.profile?.workoutHistory || []).slice(-5).reverse();
+        if (history.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-3 text-secondary small">
+                    Belum ada riwayat sesi yang tercatat hari ini. Klik tombol <strong>Mulai</strong> pada gerakan apa pun untuk mencatat rekor pertama Anda!
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = history.map(item => {
+            const mins = Math.max(1, Math.round((item.totalSeconds || 60) / 60));
+            return `
+                <div class="d-flex align-items-center justify-content-between p-2 px-3 mb-2 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20">
+                    <div>
+                        <div class="text-white fw-bold small">${item.title || 'Sesi Latihan'}</div>
+                        <div class="text-muted" style="font-size: 0.72rem;">${item.exercisesCount || 1} Gerakan • Durasi ~${mins} menit</div>
+                    </div>
+                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-25 font-monospace">
+                        🔥 ${item.calories || 28} kkal
+                    </span>
+                </div>
+            `;
+        }).join('');
     }
 }
 

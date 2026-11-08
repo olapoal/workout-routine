@@ -20,7 +20,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Luxury Athletic Theme CSS -->
-    <link rel="stylesheet" href="css/style.css?v=3.0">
+    <link rel="stylesheet" href="css/style.css?v=6.0">
 </head>
 <body>
 
@@ -35,8 +35,8 @@
             <div class="brand-wrapper">
                 <img src="assets/logo.png" alt="Pulse Fit Logo" class="brand-logo-img">
                 <div>
-                    <div class="brand-text">Pulse Fit</div>
-                    <span class="brand-badge-pill">Personal Trainer Pro</span>
+                    <div class="brand-text">Pulse Fit <span class="text-success fw-extrabold">PRO</span></div>
+                    <span class="brand-badge-pill" id="navbarAthleteRankBadge">⚡ Spartan Athlete</span>
                 </div>
             </div>
 
@@ -49,11 +49,14 @@
                     <button class="nav-dock-btn" data-app-tab="exercises">
                         <i class="fas fa-dumbbell"></i> <span>Katalog Gerakan</span>
                     </button>
+                    <button class="nav-dock-btn" data-app-tab="progress">
+                        <i class="fas fa-chart-line text-info"></i> <span>Progres & Anatomi</span>
+                    </button>
                     <button class="nav-dock-btn" data-app-tab="voice-ai">
                         <i class="fas fa-headset text-success"></i> <span>Coach Suara AI</span>
                     </button>
                     <button class="nav-dock-btn" data-app-tab="nutrition">
-                        <i class="fas fa-apple-whole text-warning"></i> <span>Nutrisi & Makro</span>
+                        <i class="fas fa-apple-whole text-warning"></i> <span>Nutrisi & Menu</span>
                     </button>
                     <button class="nav-dock-btn" data-app-tab="settings">
                         <i class="fas fa-sliders"></i> <span>Pengaturan</span>
@@ -71,13 +74,16 @@
         </div>
 
         <!-- Mobile Navigation Dock (Below Header on Small Screens) -->
-        <div class="container-fluid d-md-none px-3 pt-2">
-            <div class="nav-dock-container w-100 justify-content-center">
+        <div class="container-fluid d-md-none px-2 pt-2">
+            <div class="nav-dock-container w-100 justify-content-center flex-wrap">
                 <button class="nav-dock-btn active btn-sm" data-app-tab="routine">
                     <i class="fas fa-calendar-check"></i> <span>Jadwal</span>
                 </button>
                 <button class="nav-dock-btn btn-sm" data-app-tab="exercises">
                     <i class="fas fa-dumbbell"></i> <span>Gerakan</span>
+                </button>
+                <button class="nav-dock-btn btn-sm" data-app-tab="progress">
+                    <i class="fas fa-chart-line text-info"></i> <span>Progres</span>
                 </button>
                 <button class="nav-dock-btn btn-sm" data-app-tab="voice-ai">
                     <i class="fas fa-headset text-success"></i> <span>Coach AI</span>
@@ -118,7 +124,7 @@
                         </div>
                     </div>
 
-                    <!-- Metrics Stats -->
+                    <!-- Metrics Stats (4 Kartu Statistik Atletik) -->
                     <div class="d-flex flex-wrap gap-3">
                         <div class="hero-stat-box">
                             <div class="hero-stat-label mb-1">
@@ -130,7 +136,23 @@
 
                         <div class="hero-stat-box">
                             <div class="hero-stat-label mb-1">
-                                <i class="fas fa-chart-pie text-info me-1"></i> Selesai
+                                <i class="fas fa-bolt text-danger me-1"></i> Terbakar
+                            </div>
+                            <div id="statTotalCalories" class="hero-stat-value text-warning">0 kkal</div>
+                            <span class="text-muted small" style="font-size: 0.72rem;">Total Kalori</span>
+                        </div>
+
+                        <div class="hero-stat-box">
+                            <div class="hero-stat-label mb-1">
+                                <i class="fas fa-Medal text-primary me-1"></i> Level XP
+                            </div>
+                            <div id="statAthleteLevel" class="hero-stat-value text-white">Lv. 1</div>
+                            <span id="statAthleteRankSub" class="text-success small fw-semibold" style="font-size: 0.72rem;">Rookie</span>
+                        </div>
+
+                        <div class="hero-stat-box">
+                            <div class="hero-stat-label mb-1">
+                                <i class="fas fa-chart-pie text-info me-1"></i> Progres
                             </div>
                             <div id="statProgressPercent" class="hero-stat-value text-info">0%</div>
                             <span class="text-muted small" style="font-size: 0.72rem;">Target Program</span>
@@ -139,8 +161,37 @@
                 </div>
 
                 <!-- Total Progress Bar -->
-                <div class="progress mt-4 bg-black bg-opacity-60" style="height: 5px; border-radius: 9999px;">
+                <div class="progress mt-4 bg-black bg-opacity-60" style="height: 6px; border-radius: 9999px;">
                     <div id="statTotalProgressBar" class="progress-bar bg-success" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Quick Express Workouts Bar (Latihan Kilat 1-Klik) -->
+            <div class="pro-card p-3 px-4 mb-4 express-workout-banner">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="express-icon-pulse">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.96rem;">Sesi Latihan Kilat (Express 1-Klik Bersama Coach)</div>
+                            <small class="text-secondary" style="font-size: 0.78rem;">Punya waktu singkat? Pilih mode latihan instan di samping dan Coach langsung memandu Anda!</small>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-express-pill" onclick="window.appInstance.startExpressWorkout('warmup')">
+                            <i class="fas fa-child-reaching text-info me-1"></i> Pemanasan (5 Menit)
+                        </button>
+                        <button type="button" class="btn btn-sm btn-express-pill" onclick="window.appInstance.startExpressWorkout('hiit7')">
+                            <i class="fas fa-fire-flame-curved text-warning me-1"></i> HIIT Bakar Lemak (7 Menit)
+                        </button>
+                        <button type="button" class="btn btn-sm btn-express-pill" onclick="window.appInstance.startExpressWorkout('abs5')">
+                            <i class="fas fa-shield-heart text-success me-1"></i> Sixpack Core (6 Menit)
+                        </button>
+                        <button type="button" class="btn btn-sm btn-express-pill" onclick="window.appInstance.startExpressWorkout('chest5')">
+                            <i class="fas fa-dumbbell text-danger me-1"></i> Dada & Lengan (6 Menit)
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -229,12 +280,12 @@
                 <!-- Injected dynamically by app.js -->
             </div>
 
-            <!-- Daily Hydration Quick Tracker Section -->
+            <!-- Daily Hydration Quick Tracker Section (Interactive 8 Glasses) -->
             <div class="pro-card p-4 mt-4">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                     <div class="d-flex align-items-center gap-3">
                         <div class="p-3 rounded-3" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
-                            <i class="fas fa-droplet fa-2x"></i>
+                            <i class="fas fa-glass-water-droplet fa-2x"></i>
                         </div>
                         <div>
                             <span class="text-muted small text-uppercase fw-bold d-block mb-1" style="font-size: 0.72rem;">Target Hidrasi Air Harian</span>
@@ -245,9 +296,12 @@
                             </div>
                         </div>
                     </div>
+                    <div id="waterGlassesInteractiveGrid" class="d-flex flex-wrap align-items-center gap-2">
+                        <!-- 8 Interactive Glasses Injected by app.js -->
+                    </div>
                     <div class="d-flex gap-2">
                         <button id="btnDrinkWater" class="btn btn-outline-info rounded-pill px-4 py-2 btn-sm fw-semibold">
-                            <i class="fas fa-plus me-1"></i> Tambah 1 Gelas (250 ml)
+                            <i class="fas fa-plus me-1"></i> +1 Gelas (250 ml)
                         </button>
                         <button id="btnResetWater" class="btn btn-sm btn-outline-secondary rounded-circle px-3" title="Reset Hari Ini">
                             <i class="fas fa-rotate-left"></i>
@@ -266,26 +320,181 @@
         <!-- ======================================================== -->
         <section id="tab-exercises" class="app-tab-panel d-none">
             <div class="pro-card p-4 p-md-5 mb-4">
-                <div class="mb-4">
-                    <span class="pro-chip chip-active mb-2"><i class="fas fa-book-open me-1"></i> Exercise Form Library</span>
-                    <h3 class="fw-bold text-white mb-2" style="font-size: 1.75rem;">Katalog Gerakan & Analisis Teknik</h3>
-                    <p class="text-secondary small mb-0">Setiap gerakan dipetakan dengan animasi visual biomekanik, target otot utama dan sekunder, ritme tempo repetisi, serta teknik pernapasan yang tepat.</p>
+                <div class="row g-3 align-items-end mb-4">
+                    <div class="col-lg-7">
+                        <span class="pro-chip chip-active mb-2"><i class="fas fa-book-open me-1"></i> Biomechanical Exercise Library</span>
+                        <h3 class="fw-bold text-white mb-2" style="font-size: 1.75rem;">Katalog Gerakan & Analisis Teknik</h3>
+                        <p class="text-secondary small mb-0">Setiap gerakan dilengkapi animasi anatomi multi-sendi 60 FPS, panduan suara Personal Trainer, hitung repetisi otomatis, dan countdown waktu.</p>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary border-opacity-25 text-secondary">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" id="exerciseSearchInput" class="form-control" placeholder="Cari nama gerakan atau otot (mis. Squat, Dada, Sixpack)...">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Filter Kategori Chips -->
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-sm btn-outline-light rounded-pill active px-3" data-exercise-filter="all">Semua Gerakan</button>
-                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="chest">Dada & Triceps</button>
-                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="abs">Perut & Sixpack</button>
-                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="legs">Kaki & Bokong</button>
-                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="cardio">Kardio & Fat Burn</button>
-                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="back">Punggung & Postur</button>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-sm btn-outline-light rounded-pill active px-3" data-exercise-filter="all">Semua Gerakan</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="chest">💪 Dada & Triceps</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="abs">🔥 Perut & Sixpack</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="legs">🦵 Kaki & Bokong</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="cardio">⚡ Kardio & Fat Burn</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="back">🛡️ Punggung & Postur</button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <select id="exerciseEquipmentFilter" class="form-select form-select-sm" style="width: auto; min-width: 170px;">
+                            <option value="all">Semua Alat</option>
+                            <option value="none">Tanpa Alat (Bodyweight)</option>
+                            <option value="dumbbell">Dumbbell</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <!-- Exercises Grid Container -->
             <div id="exerciseLibraryGrid" class="row g-4">
                 <!-- Injected dynamically by app.js -->
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- TAB 2B: PROGRES, PETA OTOT ANATOMI & PENCAPAIAN          -->
+        <!-- ======================================================== -->
+        <section id="tab-progress" class="app-tab-panel d-none">
+            <div class="row g-4">
+                <!-- Kolom Kiri: Peta Anatomi Otot Interaktif -->
+                <div class="col-lg-5">
+                    <div class="pro-card p-4 h-100">
+                        <span class="pro-chip chip-active mb-2"><i class="fas fa-person-rays me-1"></i> Interactive Muscle Map</span>
+                        <h4 class="text-white fw-bold mb-1">Peta Anatomi Target Otot</h4>
+                        <p class="text-secondary small mb-3">Klik area otot pada diagram tubuh di bawah untuk melihat gerakan yang melatih otot tersebut atau langsung mulai sesi latihan fokus.</p>
+
+                        <!-- Interactive SVG Anatomical Muscle Map -->
+                        <div class="muscle-map-stage text-center p-3 rounded-4 bg-black bg-opacity-50 border border-secondary border-opacity-20 mb-3">
+                            <svg viewBox="0 0 260 360" class="interactive-body-svg" style="max-height: 310px; width: 100%;">
+                                <defs>
+                                    <radialGradient id="muscleHighlightGrad" cx="50%" cy="50%" r="50%">
+                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.9"/>
+                                        <stop offset="100%" stop-color="#059669" stop-opacity="0.45"/>
+                                    </radialGradient>
+                                </defs>
+                                <!-- Grid Background -->
+                                <line x1="130" y1="10" x2="130" y2="350" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4"/>
+                                <!-- Head & Neck -->
+                                <circle cx="130" cy="36" r="20" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+                                <rect x="123" y="55" width="14" height="14" rx="4" fill="#1e293b"/>
+
+                                <!-- Shoulders (Deltoids) -> chest/arms -->
+                                <g class="body-muscle-zone" data-muscle-zone="chest" onclick="window.appInstance.selectMuscleZone('chest', 'Bahu & Dada (Upper Body Push)')">
+                                    <ellipse cx="86" cy="84" rx="16" ry="14" class="muscle-part" id="mapZoneShouldersL"/>
+                                    <ellipse cx="174" cy="84" rx="16" ry="14" class="muscle-part" id="mapZoneShouldersR"/>
+                                    <!-- Chest (Pectorals) -->
+                                    <path d="M98,68 L128,68 L128,112 L96,106 Z" class="muscle-part active-zone" id="mapZoneChestL"/>
+                                    <path d="M132,68 L162,68 L164,106 L132,112 Z" class="muscle-part active-zone" id="mapZoneChestR"/>
+                                </g>
+
+                                <!-- Arms (Biceps / Triceps / Forearms) -->
+                                <g class="body-muscle-zone" data-muscle-zone="chest" onclick="window.appInstance.selectMuscleZone('chest', 'Lengan, Triceps & Bahu')">
+                                    <rect x="68" y="98" width="16" height="42" rx="8" class="muscle-part"/>
+                                    <rect x="176" y="98" width="16" height="42" rx="8" class="muscle-part"/>
+                                    <rect x="62" y="142" width="14" height="40" rx="6" class="muscle-part"/>
+                                    <rect x="184" y="142" width="14" height="40" rx="6" class="muscle-part"/>
+                                </g>
+
+                                <!-- Core / Sixpack Abs & Obliques -->
+                                <g class="body-muscle-zone" data-muscle-zone="abs" onclick="window.appInstance.selectMuscleZone('abs', 'Otot Perut Sixpack & Core')">
+                                    <rect x="108" y="116" width="19" height="18" rx="4" class="muscle-part active-zone"/>
+                                    <rect x="133" y="116" width="19" height="18" rx="4" class="muscle-part active-zone"/>
+                                    <rect x="108" y="137" width="19" height="18" rx="4" class="muscle-part active-zone"/>
+                                    <rect x="133" y="137" width="19" height="18" rx="4" class="muscle-part active-zone"/>
+                                    <rect x="108" y="158" width="19" height="20" rx="4" class="muscle-part active-zone"/>
+                                    <rect x="133" y="158" width="19" height="20" rx="4" class="muscle-part active-zone"/>
+                                    <!-- Obliques -->
+                                    <path d="M96,114 L105,116 L105,175 L98,170 Z" class="muscle-part"/>
+                                    <path d="M164,114 L155,116 L155,175 L162,170 Z" class="muscle-part"/>
+                                </g>
+
+                                <!-- Legs (Quads, Hamstrings, Calves) -->
+                                <g class="body-muscle-zone" data-muscle-zone="legs" onclick="window.appInstance.selectMuscleZone('legs', 'Otot Paha, Glutes & Kaki')">
+                                    <path d="M98,184 L126,184 L122,258 L98,258 Z" class="muscle-part"/>
+                                    <path d="M134,184 L162,184 L162,258 L138,258 Z" class="muscle-part"/>
+                                    <rect x="100" y="264" width="20" height="62" rx="9" class="muscle-part"/>
+                                    <rect x="140" y="264" width="20" height="62" rx="9" class="muscle-part"/>
+                                </g>
+                            </svg>
+
+                            <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+                                <button class="btn btn-xs btn-outline-success rounded-pill px-3 py-1 small" onclick="window.appInstance.selectMuscleZone('abs', 'Otot Perut Sixpack & Core')">🔥 Perut & Core</button>
+                                <button class="btn btn-xs btn-outline-info rounded-pill px-3 py-1 small" onclick="window.appInstance.selectMuscleZone('chest', 'Otot Dada, Bahu & Lengan')">💪 Dada & Lengan</button>
+                                <button class="btn btn-xs btn-outline-warning rounded-pill px-3 py-1 small" onclick="window.appInstance.selectMuscleZone('legs', 'Otot Kaki, Paha & Glutes')">🦵 Kaki & Paha</button>
+                                <button class="btn btn-xs btn-outline-light rounded-pill px-3 py-1 small" onclick="window.appInstance.selectMuscleZone('back', 'Otot Punggung & Postur')">🛡️ Punggung</button>
+                            </div>
+                        </div>
+
+                        <!-- Selected Muscle Zone Quick Exercises -->
+                        <div id="selectedMuscleZonePanel" class="p-3 rounded-3 bg-dark bg-opacity-50 border border-secondary border-opacity-25">
+                            <!-- Injected dynamically by app.js -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kolom Kanan: Body Weight Tracker, Achievements & Riwayat Latihan -->
+                <div class="col-lg-7">
+                    <!-- Body Transformation & BMI Tracker -->
+                    <div class="pro-card p-4 mb-4">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div>
+                                <span class="pro-chip chip-active mb-1"><i class="fas fa-weight-scale me-1"></i> Body Metrics & BMI</span>
+                                <h4 class="text-white fw-bold mb-0">Tracker Berat Badan & Lingkar Perut</h4>
+                            </div>
+                            <span id="bmiStatusBadge" class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-50 px-3 py-2 rounded-pill">
+                                BMI: --
+                            </span>
+                        </div>
+
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-sm-4">
+                                <label class="form-label text-secondary small mb-1">Berat Badan Saat Ini (kg)</label>
+                                <input type="number" id="inputTrackWeight" step="0.1" class="form-control form-control-sm" placeholder="Contoh: 68.5">
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label text-secondary small mb-1">Lingkar Perut (cm)</label>
+                                <input type="number" id="inputTrackWaist" step="0.5" class="form-control form-control-sm" placeholder="Contoh: 82">
+                            </div>
+                            <div class="col-sm-4">
+                                <button type="button" id="btnSaveBodyLog" class="btn btn-pro-primary btn-sm w-100 py-2">
+                                    <i class="fas fa-plus-circle me-1"></i> Catat Progres Fisik
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Visual SVG Trend Chart -->
+                        <div id="bodyWeightChartContainer" class="p-3 rounded-3 bg-black bg-opacity-50 border border-secondary border-opacity-20">
+                            <!-- Rendered by app.js -->
+                        </div>
+                    </div>
+
+                    <!-- Trophy & Achievement Badges -->
+                    <div class="pro-card p-4 mb-4">
+                        <h5 class="text-white fw-bold mb-3"><i class="fas fa-trophy text-warning me-2"></i>Piala & Medali Pencapaian Anda</h5>
+                        <div id="achievementsGrid" class="row g-3">
+                            <!-- Rendered by app.js -->
+                        </div>
+                    </div>
+
+                    <!-- Recent Workout History Log -->
+                    <div class="pro-card p-4">
+                        <h5 class="text-white fw-bold mb-3"><i class="fas fa-clock-rotate-left text-success me-2"></i>Riwayat Sesi Latihan Terakhir</h5>
+                        <div id="workoutHistoryList">
+                            <!-- Rendered by app.js -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -480,7 +689,7 @@
                                 </div>
                             </div>
 
-                            <div class="row g-3 text-center">
+                            <div class="row g-3 text-center mb-4">
                                 <div class="col-md-4">
                                     <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
                                         <span class="text-danger small fw-bold d-block mb-1">Protein</span>
@@ -498,6 +707,19 @@
                                         <span class="text-info small fw-bold d-block mb-1">Lemak Sehat</span>
                                         <h4 id="resFat" class="text-white fw-bold mb-0 font-monospace">48g</h4>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Jadwal Menu Makanan Harian Indonesia Terpersonalisasi -->
+                            <div class="border-top border-secondary border-opacity-25 pt-3">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                                    <h6 class="text-white fw-bold mb-0"><i class="fas fa-utensils text-warning me-2"></i>Rekomendasi Jadwal Menu Makan Harian (Menu Lokal Indonesia):</h6>
+                                    <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="window.appInstance.speakCustomMealPlan()">
+                                        <i class="fas fa-volume-high me-1"></i> Dengarkan Penjelasan Coach
+                                    </button>
+                                </div>
+                                <div id="resIndonesianMealPlan" class="row g-3">
+                                    <!-- Injected by app.js -->
                                 </div>
                             </div>
                         </div>
@@ -1184,12 +1406,21 @@
         </div>
     </div>
 
+    <!-- Floating Quick AI Coach Action Button (Accessible Anywhere) -->
+    <div class="floating-coach-fab-group">
+        <button type="button" class="floating-coach-fab" onclick="window.appInstance.switchTab('voice-ai')" title="Ngobrol Suara Live dengan Personal Trainer AI">
+            <span class="fab-pulse-ring"></span>
+            <i class="fas fa-headset"></i>
+            <span class="fab-label d-none d-sm-inline">Tanya Coach AI</span>
+        </button>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/exercises.js?v=5.4"></script>
-    <script src="js/voice-ai.js?v=5.4"></script>
-    <script src="js/workout-player.js?v=5.4"></script>
-    <script src="js/auth-lynk.js?v=5.4"></script>
-    <script src="js/app.js?v=5.4"></script>
+    <script src="js/exercises.js?v=6.0"></script>
+    <script src="js/voice-ai.js?v=6.0"></script>
+    <script src="js/workout-player.js?v=6.0"></script>
+    <script src="js/auth-lynk.js?v=6.0"></script>
+    <script src="js/app.js?v=6.0"></script>
 </body>
 </html>
