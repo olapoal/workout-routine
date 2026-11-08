@@ -756,7 +756,7 @@ class WorkoutApp {
             } else {
                 // Tampilkan Daftar Gerakan Hari Ini
                 const exListHtml = currentDayData.exercises.map((ex, idx) => `
-                    <div class="exercise-row">
+                    <div class="exercise-row flex-wrap gap-2">
                         <div class="d-flex align-items-center gap-3">
                             <span class="exercise-step-badge">${idx + 1}</span>
                             <div>
@@ -764,13 +764,23 @@ class WorkoutApp {
                                 <div class="small text-muted">
                                     <span class="text-success fw-medium font-monospace">${ex.duration} detik</span>
                                     <span class="mx-1">•</span>
+                                    <span class="text-info fw-medium font-monospace">${ex.defaultReps || 12} repetisi</span>
+                                    <span class="mx-1">•</span>
                                     <span>${ex.targetMuscles?.primary?.join(', ')}</span>
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-pro-secondary btn-sm" onclick="window.appInstance.openExerciseDetailModal('${ex.id}')">
-                            <i class="fas fa-eye me-1"></i> Form & Tips
-                        </button>
+                        <div class="d-flex align-items-center gap-2 ms-auto">
+                            <button class="btn btn-pro-secondary btn-sm" onclick="window.appInstance.openExerciseDetailModal('${ex.id}')">
+                                <i class="fas fa-eye me-1"></i> Detail Form
+                            </button>
+                            <button class="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold" title="Mulai gerakan ini dengan panduan Coach" onclick="window.appInstance.startWorkoutFromIndex(${idx}, 'reps')">
+                                <i class="fas fa-play me-1"></i> Mulai (Repetisi)
+                            </button>
+                            <button class="btn btn-outline-info btn-sm rounded-pill px-3 fw-semibold" title="Mulai gerakan ini dengan Countdown Waktu" onclick="window.appInstance.startWorkoutFromIndex(${idx}, 'time')">
+                                <i class="fas fa-stopwatch me-1"></i> Timer
+                            </button>
+                        </div>
                     </div>
                 `).join('');
 
@@ -786,9 +796,12 @@ class WorkoutApp {
                                 <h3 class="text-white fw-bold mb-1">${currentDayData.title}</h3>
                                 <p class="text-secondary small mb-0">${currentDayData.description}</p>
                             </div>
-                            <div>
-                                <button class="btn btn-pro-primary" onclick="window.appInstance.startActiveWorkout()">
-                                    <i class="fas fa-play me-2"></i> Mulai Latihan Sekarang
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-pro-primary" onclick="window.appInstance.startActiveWorkout('reps')">
+                                    <i class="fas fa-hashtag me-2"></i> Mulai Sesi (Hitungan Repetisi Coach)
+                                </button>
+                                <button class="btn btn-outline-info rounded-pill px-4 py-2 fw-bold" onclick="window.appInstance.startActiveWorkout('time')">
+                                    <i class="fas fa-stopwatch me-2"></i> Mulai Sesi (Countdown Waktu)
                                 </button>
                             </div>
                         </div>
@@ -820,7 +833,7 @@ class WorkoutApp {
         }
     }
 
-    startActiveWorkout() {
+    startActiveWorkout(mode = 'time') {
         const schedule = this.profile?.programSchedule;
         const currentDayData = schedule?.find(d => d.dayNumber === this.activeDay);
         if (!currentDayData || !currentDayData.exercises || currentDayData.exercises.length === 0) {
@@ -828,7 +841,29 @@ class WorkoutApp {
             return;
         }
 
-        this.player.startWorkout(currentDayData.exercises, currentDayData.title);
+        this.player.startWorkout(currentDayData.exercises, currentDayData.title, {
+            initialMode: mode,
+            startIndex: 0
+        });
+    }
+
+    startWorkoutFromIndex(index = 0, mode = 'reps') {
+        const schedule = this.profile?.programSchedule;
+        const currentDayData = schedule?.find(d => d.dayNumber === this.activeDay);
+        if (!currentDayData || !currentDayData.exercises || currentDayData.exercises.length === 0) {
+            alert("Tidak ada gerakan untuk sesi ini.");
+            return;
+        }
+
+        this.player.startWorkout(currentDayData.exercises, currentDayData.title, {
+            initialMode: mode,
+            startIndex: index
+        });
+    }
+
+    startSingleExercise(exerciseId, mode = 'reps') {
+        this.closeExerciseDetailModal();
+        this.player.startSingleExerciseSession(exerciseId, mode, 3);
     }
 
     handleWorkoutCompleted(result) {
@@ -838,7 +873,7 @@ class WorkoutApp {
             this.profile.completedDays = [];
         }
 
-        if (!this.profile.completedDays.includes(this.activeDay)) {
+        if (!result.isSingleExercise && !this.profile.completedDays.includes(this.activeDay)) {
             this.profile.completedDays.push(this.activeDay);
         }
 
@@ -918,6 +953,7 @@ class WorkoutApp {
 
         grid.innerHTML = filtered.map(ex => {
             const primaryMuscle = ex.targetMuscles?.primary?.join(', ') || 'Semua Otot';
+            const isStaticPlank = ex.svgType === 'plank';
             return `
                 <div class="col-md-6 col-lg-4">
                     <div class="pro-card pro-card-hover h-100 overflow-hidden d-flex flex-column justify-content-between">
@@ -928,15 +964,23 @@ class WorkoutApp {
                             <div>
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <span class="pro-chip chip-active" style="font-size: 0.72rem; padding: 0.2rem 0.6rem;">${ex.category.toUpperCase()}</span>
-                                    <span class="text-secondary small font-monospace">${ex.equipment === 'none' ? 'Bodyweight' : 'Dumbbell'}</span>
+                                    <span class="text-secondary small font-monospace">${ex.defaultDuration || 40}s • ${ex.defaultReps || 12} Rep</span>
                                 </div>
                                 <h5 class="text-white fw-bold mb-1" style="font-size: 1.05rem;">${ex.name}</h5>
                                 <p class="small text-secondary mb-2">${ex.englishName}</p>
                                 <div class="small text-muted mb-3"><span class="text-secondary fw-semibold">Target Otot:</span> ${primaryMuscle}</div>
                             </div>
-                            <div class="mt-2">
+                            <div class="mt-2 d-flex flex-column gap-2">
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-pro-primary btn-sm flex-grow-1 py-2 fw-bold" onclick="window.appInstance.startSingleExercise('${ex.id}', '${isStaticPlank ? 'time' : 'reps'}')">
+                                        <i class="fas fa-play me-1"></i> Mulai (${isStaticPlank ? 'Timer Coach' : 'Hitungan Rep'})
+                                    </button>
+                                    <button class="btn btn-outline-info btn-sm rounded-pill px-3 py-2 fw-semibold" title="Mulai dengan Countdown Waktu" onclick="window.appInstance.startSingleExercise('${ex.id}', 'time')">
+                                        <i class="fas fa-stopwatch"></i>
+                                    </button>
+                                </div>
                                 <button class="btn btn-pro-secondary btn-sm w-100" onclick="window.appInstance.openExerciseDetailModal('${ex.id}')">
-                                    <i class="fas fa-info-circle me-1"></i> Form & Panduan Suara
+                                    <i class="fas fa-info-circle me-1"></i> Detail Form & Panduan Teknik
                                 </button>
                             </div>
                         </div>
@@ -984,12 +1028,26 @@ class WorkoutApp {
             `).join('');
         }
 
-        // Tombol Dengarkan Suara PT
+        // Tombol Dengarkan Suara PT & Tombol Mulai Latihan Gerakan Ini
         const btnListenCoach = document.getElementById('btnDetailListenCoach');
         if (btnListenCoach) {
             btnListenCoach.onclick = () => {
                 const cue = ex.voiceCues?.start || `Lakukan gerakan ${ex.name} dengan form yang benar.`;
                 this.voiceCoach.speak(cue);
+            };
+        }
+
+        const btnStartReps = document.getElementById('btnDetailStartReps');
+        if (btnStartReps) {
+            btnStartReps.onclick = () => {
+                this.startSingleExercise(ex.id, ex.svgType === 'plank' ? 'time' : 'reps');
+            };
+        }
+
+        const btnStartTimer = document.getElementById('btnDetailStartTimer');
+        if (btnStartTimer) {
+            btnStartTimer.onclick = () => {
+                this.startSingleExercise(ex.id, 'time');
             };
         }
 
