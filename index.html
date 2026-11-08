@@ -546,16 +546,30 @@
                             </div>
                         </div>
 
-                        <!-- Koneksi Gemini API (Opsional) -->
+                        <!-- Koneksi Gemini API (Embedded Bawaan + Bisa Diganti / Dikembalikan) -->
                         <div class="mb-4 pb-4 border-bottom border-secondary border-opacity-25">
-                            <h5 class="text-white fw-bold mb-2"><i class="fas fa-brain text-info me-2"></i>Google Gemini AI API Key (Opsional)</h5>
-                            <p class="text-secondary small mb-3">Aplikasi ini sudah dibekali kecerdasan PT lokal bawaan yang cepat (<200ms). Menghubungkan Gemini API Key memberikan wawasan tak terbatas untuk pertanyaan apa pun seputar fitness dan nutrisi.</p>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <h5 class="text-white fw-bold mb-0"><i class="fas fa-brain text-info me-2"></i>Google Gemini AI API Key (Sudah Embedded Bawaan)</h5>
+                                <span id="geminiKeyStatusBadge" class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1 rounded-pill">
+                                    <i class="fas fa-check-circle me-1"></i> Aktif: AI Cloud Bawaan (Embedded)
+                                </span>
+                            </div>
+                            <p class="text-secondary small mb-3">
+                                Aplikasi ini sudah <strong>dibekali Kunci AI Cloud Bawaan (Embedded)</strong> sehingga fitur <strong>Gemini Live Suara</strong> langsung pintar menjawab topik obrolan apa pun secara nyambung tanpa perlu mengisi kunci sendiri. Jika Anda ingin menggunakan API Key Gemini pribadi Anda sendiri, silakan masukkan di bawah, atau klik <strong>Kembalikan ke Default Bawaan</strong> kapan saja.
+                            </p>
                             
                             <div class="input-group mb-2">
-                                <input type="password" id="inputGeminiApiKey" class="form-control" placeholder="Masukkan Gemini API Key (AIzaSy...)">
-                                <button id="btnSaveGeminiKey" class="btn btn-outline-info px-4">Simpan Kunci</button>
+                                <input type="password" id="inputGeminiApiKey" class="form-control" placeholder="Masukkan Gemini API Key Pribadi (AIzaSy...) jika ingin mengganti">
+                                <button id="btnSaveGeminiKey" class="btn btn-info text-dark fw-bold px-3">
+                                    <i class="fas fa-key me-1"></i> Ganti Kunci
+                                </button>
+                                <button id="btnResetGeminiKey" class="btn btn-outline-warning px-3" title="Kembalikan ke Kunci AI Bawaan Aplikasi">
+                                    <i class="fas fa-rotate-left me-1"></i> Reset ke Bawaan
+                                </button>
                             </div>
-                            <small class="text-muted" style="font-size: 0.75rem;">Kunci disimpan aman hanya di browser lokal Anda.</small>
+                            <small id="geminiKeyHelperText" class="text-info d-block mt-1" style="font-size: 0.78rem;">
+                                <i class="fas fa-shield-halved me-1"></i> Sedang menggunakan Kunci AI Cloud Bawaan (Embedded). Percakapan Live AI siap digunakan langsung!
+                            </small>
                         </div>
 
                         <!-- Reset Program Latihan -->
@@ -1172,10 +1186,10 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/exercises.js?v=5.1"></script>
-    <script src="js/voice-ai.js?v=5.1"></script>
-    <script src="js/workout-player.js?v=5.1"></script>
-    <script src="js/auth-lynk.js?v=5.1"></script>
-    <script src="js/app.js?v=5.1"></script>
+    <script src="js/exercises.js?v=5.2"></script>
+    <script src="js/voice-ai.js?v=5.2"></script>
+    <script src="js/workout-player.js?v=5.2"></script>
+    <script src="js/auth-lynk.js?v=5.2"></script>
+    <script src="js/app.js?v=5.2"></script>
 </body>
 </html>

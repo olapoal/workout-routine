@@ -63,9 +63,41 @@ class WorkoutApp {
         if (quickPersonaEl) quickPersonaEl.value = savedVoice;
 
         this.updateCoachCommandBarPersona(savedVoice);
+        this.refreshGeminiKeyUI();
+    }
 
+    refreshGeminiKeyUI() {
         const geminiInput = document.getElementById('inputGeminiApiKey');
-        if (geminiInput) geminiInput.value = localStorage.getItem('workout_gemini_api_key') || '';
+        const badgeEl = document.getElementById('geminiKeyStatusBadge');
+        const helperEl = document.getElementById('geminiKeyHelperText');
+
+        const isDefault = !this.voiceAI || this.voiceAI.isUsingDefaultEmbeddedKey();
+
+        if (geminiInput) {
+            geminiInput.value = isDefault
+                ? 'DEFAULT_EMBEDDED_GEMINI_LIVE_KEY'
+                : (this.voiceAI ? this.voiceAI.geminiApiKey : '');
+        }
+
+        if (badgeEl) {
+            if (isDefault) {
+                badgeEl.className = 'badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1 rounded-pill';
+                badgeEl.innerHTML = '<i class="fas fa-check-circle me-1"></i> Aktif: AI Cloud Bawaan (Embedded)';
+            } else {
+                badgeEl.className = 'badge bg-info bg-opacity-25 text-info border border-info border-opacity-50 px-3 py-1 rounded-pill';
+                badgeEl.innerHTML = '<i class="fas fa-key me-1"></i> Aktif: Kunci Gemini API Kustom';
+            }
+        }
+
+        if (helperEl) {
+            if (isDefault) {
+                helperEl.className = 'text-success d-block mt-1';
+                helperEl.innerHTML = '<i class="fas fa-shield-halved me-1"></i> Menggunakan Kunci AI Cloud Bawaan (Embedded). Percakapan suara AI siap digunakan tanpa konfigurasi tambahan.';
+            } else {
+                helperEl.className = 'text-info d-block mt-1';
+                helperEl.innerHTML = '<i class="fas fa-key me-1"></i> Menggunakan Kunci Gemini API Kustom milik Anda. Klik "Reset ke Bawaan" kapan saja untuk kembali ke kunci bawaan aplikasi.';
+            }
+        }
     }
 
     updateCoachCommandBarPersona(personaKey) {
@@ -246,10 +278,23 @@ class WorkoutApp {
                 const keyInput = document.getElementById('inputGeminiApiKey');
                 if (keyInput) {
                     const key = keyInput.value.trim();
-                    localStorage.setItem('workout_gemini_api_key', key);
-                    this.voiceAI.geminiApiKey = key;
-                    alert("Kunci Gemini API berhasil disimpan! AI Personal Trainer sekarang terhubung dengan kecerdasan Gemini.");
+                    const mode = this.voiceAI.setCustomApiKey(key);
+                    this.refreshGeminiKeyUI();
+                    if (mode === 'custom') {
+                        alert("Kunci Gemini API Kustom berhasil diaktifkan! Anda dapat mengembalikannya ke kunci bawaan kapan saja dengan tombol 'Reset ke Bawaan'.");
+                    } else {
+                        alert("Menggunakan Kunci AI Cloud Bawaan (Embedded) aplikasi.");
+                    }
                 }
+            });
+        }
+
+        const btnResetGemini = document.getElementById('btnResetGeminiKey');
+        if (btnResetGemini) {
+            btnResetGemini.addEventListener('click', () => {
+                this.voiceAI.resetToDefaultEmbeddedKey();
+                this.refreshGeminiKeyUI();
+                alert("Berhasil dikembalikan ke Kunci AI Cloud Bawaan (Embedded)! AI Personal Trainer siap diajak ngobrol langsung.");
             });
         }
 

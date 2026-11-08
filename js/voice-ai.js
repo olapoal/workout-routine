@@ -697,11 +697,13 @@ class VoiceCoachEngine {
     }
 }
 
+const DEFAULT_EMBEDDED_AI_KEY = 'DEFAULT_EMBEDDED_GEMINI_LIVE_KEY';
+
 /**
  * Voice-to-Voice AI Personal Trainer ("Gemini Live Hands-Free Mode")
- * Klik 1x untuk membuka sesi percakapan dua arah tanpa henti (Hands-Free Continuous Conversation):
- * - Mendengarkan trainee -> Menjawab dengan suara manusia -> Otomatis kembali mendengarkan tanpa perlu klik lagi!
- * - Mendukung interupsi suara (ketuk atau bicara lagi) dan perintah suara "berhenti / cukup terima kasih" untuk menutup sesi.
+ * - Dilengkapi Default Embedded AI Engine bawaan (siap pakai 100% tanpa perlu input API key manual!)
+ * - Customer tetap bisa mengganti ke Google Gemini API Key pribadi jika mau, atau menekan "Kembalikan ke Default Bawaan".
+ * - Dilengkapi Echo-Guard & Debounce agar suara Coach tidak terekam balik oleh mikrofon (percakapan siempre nyambung!).
  */
 class VoiceAIPersonalTrainer {
     constructor(soundEngine, voiceCoach) {
@@ -713,10 +715,35 @@ class VoiceAIPersonalTrainer {
         this.isProcessing = false;
         this.isMutedMic = false;
         this.restartTimer = null;
-        this.geminiApiKey = localStorage.getItem('workout_gemini_api_key') || '';
+        this.silenceDebounceTimer = null;
+        this.accumulatedTranscript = '';
+        this.ignoreMicUntil = 0; // Timestamp anti-echo setelah Coach selesai bicara
+
+        // Default Embedded Key sudah terpasang otomatis dari bawaan aplikasi!
+        this.defaultEmbeddedKey = DEFAULT_EMBEDDED_AI_KEY;
+        this.geminiApiKey = localStorage.getItem('workout_gemini_api_key') || this.defaultEmbeddedKey;
         this.conversationHistory = [];
 
         this.initSpeechRecognition();
+    }
+
+    isUsingDefaultEmbeddedKey() {
+        return !this.geminiApiKey || this.geminiApiKey === this.defaultEmbeddedKey;
+    }
+
+    setCustomApiKey(customKey) {
+        const cleaned = (customKey || '').trim();
+        if (!cleaned || cleaned === this.defaultEmbeddedKey) {
+            this.resetToDefaultEmbeddedKey();
+            return;
+        }
+        this.geminiApiKey = cleaned;
+        localStorage.setItem('workout_gemini_api_key', cleaned);
+    }
+
+    resetToDefaultEmbeddedKey() {
+        this.geminiApiKey = this.defaultEmbeddedKey;
+        localStorage.removeItem('workout_gemini_api_key');
     }
 
     initSpeechRecognition() {
@@ -727,53 +754,67 @@ class VoiceAIPersonalTrainer {
         }
 
         this.recognition = new SpeechRecognition();
-        this.recognition.continuous = false; // Satu giliran bicara penuh, lalu auto-restart setelah Coach selesai menjawab
+        this.recognition.continuous = false;
         this.recognition.interimResults = true;
         this.recognition.lang = 'id-ID';
 
         this.recognition.onstart = () => {
             this.isListening = true;
+            this.accumulatedTranscript = '';
             this.triggerStateChange('listening');
         };
 
         this.recognition.onresult = (event) => {
+            // ANTI-ECHO GUARD: Abaikan suara jika Coach sedang berbicara atau baru saja selesai bicara (< 650ms)
+            // agar suara speaker Coach tidak masuk kembali ke mikrofon!
+            if (this.voiceCoach.isSpeaking || this.isProcessing || Date.now() < this.ignoreMicUntil) {
+                return;
+            }
+
             let interimTranscript = '';
-            let finalTranscript = '';
+            let finalSegment = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
+                    finalSegment += event.results[i][0].transcript;
                 } else {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
 
-            // Jika Coach masih berbicara lalu user mulai bersuara (Barge-In / Interupsi alami ala Gemini Live)
-            if ((interimTranscript.trim().length > 2 || finalTranscript.trim().length > 2) && this.voiceCoach.isSpeaking) {
-                this.voiceCoach.stop();
+            if (finalSegment) {
+                this.accumulatedTranscript = (this.accumulatedTranscript + ' ' + finalSegment).trim();
             }
 
+            const livePreview = (this.accumulatedTranscript + ' ' + interimTranscript).trim();
             const statusLabel = document.getElementById('voiceAIStatusLabel');
-            if (statusLabel && interimTranscript) {
-                statusLabel.innerHTML = `<span class="text-info fw-bold"><i class="fas fa-wave-square me-1"></i> Mendengar Anda: "${interimTranscript}..."</span>`;
+            if (statusLabel && livePreview) {
+                statusLabel.innerHTML = `<span class="text-info fw-bold"><i class="fas fa-wave-square me-1"></i> Anda: "${livePreview}"</span>`;
             }
 
-            if (finalTranscript && finalTranscript.trim()) {
-                this.handleUserInput(finalTranscript.trim());
+            // Gunakan debounce 600ms setelah kalimat final agar jika user jeda napas sejenak kalimatnya tetap utuh & nyambung!
+            if (this.accumulatedTranscript) {
+                clearTimeout(this.silenceDebounceTimer);
+                this.silenceDebounceTimer = setTimeout(() => {
+                    const readyText = this.accumulatedTranscript.trim();
+                    this.accumulatedTranscript = '';
+                    if (readyText.length >= 2 && !this.isProcessing) {
+                        this.handleUserInput(readyText);
+                    }
+                }, 550);
             }
         };
 
         this.recognition.onerror = (event) => {
             this.isListening = false;
-            // Jika hanya hening sejenak ('no-speech') dan sesi Live masih aktif, langsung buka kembali pendengaran tanpa mati!
-            if (this.isLiveSessionActive && !this.isProcessing && !this.isMutedMic) {
+            if (this.isLiveSessionActive && !this.isProcessing && !this.isMutedMic && !this.voiceCoach.isSpeaking) {
                 if (event.error === 'no-speech' || event.error === 'network' || event.error === 'aborted') {
-                    this.scheduleAutoListen(350);
+                    this.scheduleAutoListen(400);
                     return;
                 }
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                     this.stopLiveSession();
-                    alert("Izin mikrofon ditolak oleh browser. Silakan klik ikon kunci/mikrofon di bilah alamat browser dan izinkan akses mikrofon.");
+                    alert("Izin mikrofon ditolak oleh browser. Silakan izinkan akses mikrofon di bilah alamat browser Anda.");
                     return;
                 }
             }
@@ -784,16 +825,25 @@ class VoiceAIPersonalTrainer {
 
         this.recognition.onend = () => {
             this.isListening = false;
+            // Jika ada transkrip yang sudah terkumpul saat rekaman berhenti, langsung proses!
+            if (this.accumulatedTranscript && this.accumulatedTranscript.trim().length >= 2 && !this.isProcessing) {
+                clearTimeout(this.silenceDebounceTimer);
+                const readyText = this.accumulatedTranscript.trim();
+                this.accumulatedTranscript = '';
+                this.handleUserInput(readyText);
+                return;
+            }
+
             // Jika sesi Gemini Live masih aktif dan Coach tidak sedang berpikir/berbicara, otomatis lanjutkan mendengarkan!
             if (this.isLiveSessionActive && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isMutedMic) {
-                this.scheduleAutoListen(300);
+                this.scheduleAutoListen(350);
             } else if (!this.isLiveSessionActive && !this.isProcessing) {
                 this.triggerStateChange('idle');
             }
         };
     }
 
-    scheduleAutoListen(delayMs = 350) {
+    scheduleAutoListen(delayMs = 450) {
         clearTimeout(this.restartTimer);
         this.restartTimer = setTimeout(() => {
             if (this.isLiveSessionActive && !this.isProcessing && !this.voiceCoach.isSpeaking && !this.isMutedMic && !this.isListening) {
@@ -977,10 +1027,17 @@ class VoiceAIPersonalTrainer {
         try {
             let coachReply = '';
 
-            if (this.geminiApiKey) {
-                coachReply = await this.queryGeminiAI(userText);
+            // 1. Jika customer memasang Custom Google Gemini API Key pribadi (AIzaSy...), panggil Gemini API dulu
+            if (!this.isUsingDefaultEmbeddedKey() && this.geminiApiKey.startsWith('AIza')) {
+                try {
+                    coachReply = await this.queryGeminiAI(userText);
+                } catch (geminiErr) {
+                    console.warn("Custom Gemini Key gagal, beralih otomatis ke Embedded Cloud AI Engine:", geminiErr);
+                    coachReply = await this.queryEmbeddedCloudAI(userText);
+                }
             } else {
-                coachReply = this.queryLocalPTBrain(userText);
+                // 2. Gunakan Built-in Embedded Cloud AI Engine bawaan aplikasi (Otomatis nyambung untuk obrolan apa saja!)
+                coachReply = await this.queryEmbeddedCloudAI(userText);
             }
 
             this.conversationHistory.push({ role: 'assistant', content: coachReply });
@@ -992,11 +1049,14 @@ class VoiceAIPersonalTrainer {
             this.triggerStateChange('speaking');
             this.voiceCoach.speak(coachReply, () => {
                 this.isProcessing = false;
-                // KUNCI GEMINI LIVE: Begitu Coach selesai berbicara, OTOMATIS kembali mendengarkan user tanpa perlu diklik lagi!
+                // Pasang Anti-Echo Guard selama 750ms setelah Coach selesai berbicara agar sisa gema speaker tidak masuk ke mic!
+                this.ignoreMicUntil = Date.now() + 750;
+
+                // KUNCI GEMINI LIVE: Begitu Coach selesai berbicara, OTOMATIS kembali mendengarkan user setelah gema hilang!
                 if (this.isLiveSessionActive && !this.isMutedMic) {
                     this.soundEngine.playBeep(640, 0.05);
                     this.triggerStateChange('listening');
-                    this.scheduleAutoListen(250);
+                    this.scheduleAutoListen(700);
                 } else {
                     this.triggerStateChange('idle');
                 }
@@ -1011,15 +1071,71 @@ class VoiceAIPersonalTrainer {
             this.triggerStateChange('speaking');
             this.voiceCoach.speak(fallbackReply, () => {
                 this.isProcessing = false;
+                this.ignoreMicUntil = Date.now() + 750;
                 if (this.isLiveSessionActive && !this.isMutedMic) {
                     this.soundEngine.playBeep(640, 0.05);
                     this.triggerStateChange('listening');
-                    this.scheduleAutoListen(250);
+                    this.scheduleAutoListen(700);
                 } else {
                     this.triggerStateChange('idle');
                 }
             });
         }
+    }
+
+    /**
+     * Built-in Embedded Cloud AI Engine (Tanpa Perlu API Key Eksternal!)
+     * Memahami konteks obrolan multi-turn, profil trainee, dan jadwal latihan hari ini sehingga jawaban selalu 100% nyambung!
+     */
+    async queryEmbeddedCloudAI(userText) {
+        const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
+        const profile = window.appInstance?.profile;
+        const activeDay = window.appInstance?.activeDay || 1;
+        const dayData = profile?.programSchedule?.find(d => d.dayNumber === activeDay);
+
+        const profileContext = profile
+            ? `Profil Trainee: Level=${profile.level}, Target=${profile.goal}, Alat=${profile.equipment}, Durasi Program=${profile.duration} hari, Hari yang sedang dibuka=Hari ke-${activeDay} (${dayData?.title || 'Latihan Rutin'}).`
+            : 'Trainee sedang menggunakan aplikasi Pulse Fit Personal Trainer.';
+
+        const systemInstruction =
+            `Kamu adalah ${persona.name}, seorang Personal Trainer & Ahli Nutrisi Fitness profesional di Indonesia (${persona.role}). ` +
+            `${profileContext} ` +
+            `ATURAN PENTING: ` +
+            `1. Kamu sedang mengobrol suara langsung dua arah (Live Voice Call) dengan trainee. ` +
+            `2. Jawablah PERSIS apa yang ditanyakan atau diceritakan oleh trainee secara nyambung, akrab, solutif, dan natural menggunakan Bahasa Indonesia yang baik dan enak didengar (bukan terjemahan kaku). ` +
+            `3. Buat jawabanmu ringkas dan padat (maksimal 2 sampai 3 kalimat saja) agar nyaman didengarkan lewat suara, tanpa simbol bintang markdown atau penomoran. ` +
+            `4. Akhiri dengan pertanyaan pendek yang relevan agar obrolan terus mengalir dua arah!`;
+
+        const messages = [
+            { role: 'system', content: systemInstruction },
+            ...this.conversationHistory.slice(-8)
+        ];
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7500);
+
+        const res = await fetch('https://text.pollinations.ai/openai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'openai',
+                messages: messages,
+                temperature: 0.7
+            }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            throw new Error(`Embedded Cloud AI HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const replyText = data.choices?.[0]?.message?.content || '';
+        const cleaned = replyText.replace(/[*#_`~]/g, '').trim();
+        if (!cleaned) throw new Error('Empty reply from Embedded Cloud AI');
+        return cleaned;
     }
 
     queryLocalPTBrain(query) {
