@@ -1,9 +1,18 @@
 /**
  * js/voice-ai.js
- * Engine Audio & Live Voice AI Personal Trainer Terlengkap (v3.0)
- * 1. Web Audio API SFX (Beep, Whistle, Fanfare, Chime, Hype Drum)
- * 2. Real-Time Voice Coach Engine (3 Persona Pelatih + Live Equalizer & Teleprompter Sync)
- * 3. Instant PT Actions: Bakar Semangat, Briefing Latihan, Saran Gizi Harian
+ * Engine Audio & Ultra-Natural Neural Human Voice AI Personal Trainer (v4.0)
+ * 1. Cloud Neural Human TTS Engine (Microsoft Azure Neural Voices via Gradio Cloud + Audio Cache)
+ *    - 8 Karakter Coach dengan Aktor Suara Berbeda:
+ *      • Coach Bima  : id-ID-ArdiNeural (Bariton Tegas & Energetik)
+ *      • Coach Reza  : jv-ID-DimasNeural (Deep Bass Bodybuilder & Berwibawa)
+ *      • Coach Alex  : su-ID-JajangNeural (Tenang, Taktis & Fokus Biomekanik)
+ *      • Coach Kevin : ms-MY-OsmanNeural (Cepat, Eksplosif & Master HIIT)
+ *      • Coach Maya  : id-ID-GadisNeural (Ramah, Suportif & Detail Presisi)
+ *      • Coach Nadia : jv-ID-SitiNeural (Ceria, Lincah & Ratu Fat Burn)
+ *      • Coach Sarah : su-ID-TutiNeural (Lembut, Fokus Core & Pernapasan)
+ *      • Coach Intan : ms-MY-YasminNeural (Hangat, Memotivasi & Ahli Gizi)
+ * 2. Instant Audio Memory Cache + Automatic Fallback ke Browser TTS jika Offline
+ * 3. Web Audio API SFX (Beep, Whistle, Fanfare, Chime)
  * 4. Voice-to-Voice AI Personal Trainer (Speech-to-Text Interim & Context-Aware PT Intelligence)
  */
 
@@ -129,7 +138,6 @@ class SoundEffectsEngine {
         }
     }
 
-    // Alias untuk kompatibilitas onboarding
     playFanfare() {
         this.playVictory();
     }
@@ -140,17 +148,32 @@ class VoiceCoachEngine {
         this.synth = window.speechSynthesis || null;
         this.voices = [];
         this.enabled = true;
-        this.selectedPersona = 'bima'; // 'bima' | 'maya' | 'alex'
+        this.selectedPersona = 'bima';
         this.volume = 1.0;
         this.activeUtterance = null;
+        this.activeAudio = null;
+        this.abortController = null;
+        this.speakRequestId = 0;
         this.isSpeaking = false;
         this.lastSpokenText = '';
 
+        // Cache URL audio neural agar kalimat yang pernah diucapkan langsung diputar 0ms tanpa loading ulang
+        this.neuralAudioCache = new Map();
+
+        // Endpoint Cloud Neural TTS (Multi-Mirror High Availability)
+        this.neuralEndpoints = [
+            'https://innoai-edge-tts-text-to-speech.hf.space'
+        ];
+
+        // 8 Karakter Coach dengan Aktor Suara Neural Manusia yang Berbeda-beda!
         this.personas = {
             bima: {
                 name: 'Coach Bima',
                 gender: 'male',
                 role: 'Komandan Spartan — Tegas, Lantang & Tanpa Kompromi',
+                neuralVoice: 'id-ID-ArdiNeural - id-ID (Male)',
+                neuralRate: 8,     // +8% lebih cepat & tegas
+                neuralPitch: -2,   // -2Hz bariton atletis
                 pitch: 0.85,
                 rate: 1.06,
                 fallbackMalePitch: 0.62,
@@ -160,6 +183,9 @@ class VoiceCoachEngine {
                 name: 'Coach Reza',
                 gender: 'male',
                 role: 'Pro Bodybuilder — Berat, Berwibawa & Fokus Massa Otot',
+                neuralVoice: 'jv-ID-DimasNeural - jv-ID (Male)',
+                neuralRate: -2,    // Tempo terkontrol & berat
+                neuralPitch: -7,   // -7Hz Deep Bass Bodybuilder
                 pitch: 0.72,
                 rate: 0.96,
                 fallbackMalePitch: 0.52,
@@ -169,6 +195,9 @@ class VoiceCoachEngine {
                 name: 'Coach Alex',
                 gender: 'male',
                 role: 'Ahli Sport Science & Biomekanik — Taktis & Presisi',
+                neuralVoice: 'su-ID-JajangNeural - su-ID (Male)',
+                neuralRate: 4,     // Tenang & taktis
+                neuralPitch: 0,    // Natural jernih
                 pitch: 0.92,
                 rate: 1.02,
                 fallbackMalePitch: 0.68,
@@ -178,6 +207,9 @@ class VoiceCoachEngine {
                 name: 'Coach Kevin',
                 gender: 'male',
                 role: 'Master HIIT & Kardio — Cepat, Eksplosif & Pembakar Lemak',
+                neuralVoice: 'ms-MY-OsmanNeural - ms-MY (Male)',
+                neuralRate: 14,    // +14% cepat & eksplosif
+                neuralPitch: 3,    // +3Hz energetik
                 pitch: 0.95,
                 rate: 1.14,
                 fallbackMalePitch: 0.70,
@@ -187,6 +219,9 @@ class VoiceCoachEngine {
                 name: 'Coach Maya',
                 gender: 'female',
                 role: 'Pelatih Suportif — Ramah, Detail Form & Penuh Apresiasi',
+                neuralVoice: 'id-ID-GadisNeural - id-ID (Female)',
+                neuralRate: 5,     // Natural & ramah
+                neuralPitch: 2,    // +2Hz cerah suportif
                 pitch: 1.12,
                 rate: 1.0,
                 fallbackFemalePitch: 1.32,
@@ -195,7 +230,10 @@ class VoiceCoachEngine {
             nadia: {
                 name: 'Coach Nadia',
                 gender: 'female',
-                role: 'Ratu HIIT & Fat Burn — Ceria, Berenergi Tinggi &Lincah',
+                role: 'Ratu HIIT & Fat Burn — Ceria, Lincah & Berenergi Tinggi',
+                neuralVoice: 'jv-ID-SitiNeural - jv-ID (Female)',
+                neuralRate: 12,    // +12% lincah & membakar semangat
+                neuralPitch: 6,    // +6Hz ceria & semangat tinggi
                 pitch: 1.24,
                 rate: 1.10,
                 fallbackFemalePitch: 1.42,
@@ -205,6 +243,9 @@ class VoiceCoachEngine {
                 name: 'Coach Sarah',
                 gender: 'female',
                 role: 'Spesialis Core, Postur & Pernapasan — Tenang & Fokus',
+                neuralVoice: 'su-ID-TutiNeural - su-ID (Female)',
+                neuralRate: -4,    // Tenang & penuh kesadaran napas
+                neuralPitch: -2,   // Lembut & menenangkan
                 pitch: 1.04,
                 rate: 0.94,
                 fallbackFemalePitch: 1.25,
@@ -214,6 +255,9 @@ class VoiceCoachEngine {
                 name: 'Coach Intan',
                 gender: 'female',
                 role: 'Ahli Gizi & Transformasi Tubuh — Hangat & Memotivasi',
+                neuralVoice: 'ms-MY-YasminNeural - ms-MY (Female)',
+                neuralRate: 6,     // Hangat & mengalir
+                neuralPitch: 1,    // Natural hangat
                 pitch: 1.16,
                 rate: 1.03,
                 fallbackFemalePitch: 1.36,
@@ -235,25 +279,20 @@ class VoiceCoachEngine {
         }
     }
 
-    /**
-     * Deteksi apakah suatu objek SpeechSynthesisVoice adalah suara Pria atau Wanita
-     */
     detectVoiceGender(voice) {
         if (!voice || !voice.name) return 'unknown';
         const n = voice.name.toLowerCase();
 
-        // Daftar kata kunci suara PRIA di Windows, Edge, Chrome, Android, macOS/iOS
         const maleKeywords = [
-            'ardi', 'andika', 'male', 'pria', 'laki', 'guy', 'david', 'mark',
-            'daniel', 'george', 'james', 'richard', 'christopher', 'eric',
-            'steffan', 'andrew', 'brian', 'rishi', 'aaron', 'arthur', 'thomas'
+            'ardi', 'andika', 'dimas', 'jajang', 'osman', 'male', 'pria', 'laki', 'guy',
+            'david', 'mark', 'daniel', 'george', 'james', 'richard', 'christopher',
+            'eric', 'steffan', 'andrew', 'brian', 'rishi', 'aaron', 'arthur', 'thomas'
         ];
         if (maleKeywords.some(k => n.includes(k))) return 'male';
 
-        // Daftar kata kunci suara WANITA (Google Bahasa Indonesia default adalah Wanita)
         const femaleKeywords = [
-            'gadis', 'damayanti', 'female', 'wanita', 'perempuan', 'zira', 'hazel',
-            'susan', 'linda', 'catherine', 'heera', 'jenny', 'aria', 'sara',
+            'gadis', 'damayanti', 'siti', 'tuti', 'yasmin', 'female', 'wanita', 'perempuan',
+            'zira', 'hazel', 'susan', 'linda', 'catherine', 'heera', 'jenny', 'aria', 'sara',
             'michelle', 'ana', 'sonia', 'natasha', 'clara', 'google bahasa indonesia',
             'samantha', 'victoria', 'karen', 'moira', 'tessa'
         ];
@@ -262,50 +301,39 @@ class VoiceCoachEngine {
         return 'unknown';
     }
 
-    /**
-     * Memilih suara Bahasa Indonesia terbaik yang SESUAI GENDER Coach (Pria vs Wanita).
-     * Mengembalikan { voice, isGenderMatched } agar jika browser hanya punya 1 suara (mis. wanita),
-     * sistem otomatis melakukan modulasi frekuensi (deep bass pitch) untuk Coach Pria!
-     */
     getVoiceForPersona(persona) {
         if (!this.voices || this.voices.length === 0) {
             this.voices = this.synth ? this.synth.getVoices() : [];
         }
 
         const targetGender = persona?.gender || 'male';
-
-        // Filter semua voice berbahasa Indonesia / Melayu
         const idVoices = this.voices.filter(v =>
             v.lang && (
                 v.lang.toLowerCase().includes('id') ||
                 v.lang.toLowerCase().includes('ind') ||
-                v.lang.toLowerCase().includes('ms')
+                v.lang.toLowerCase().includes('ms') ||
+                v.lang.toLowerCase().includes('jv') ||
+                v.lang.toLowerCase().includes('su')
             )
         );
 
-        // 1. Cari suara Bahasa Indonesia yang gendernya COCOK (misal Microsoft Ardi untuk Pria, Gadis/Google untuk Wanita)
         const matchedGenderIdVoice = idVoices.find(v => {
             const g = this.detectVoiceGender(v);
-            return g === targetGender && (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Google'));
+            return g === targetGender && (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Neural'));
         }) || idVoices.find(v => this.detectVoiceGender(v) === targetGender);
 
         if (matchedGenderIdVoice) {
             return { voice: matchedGenderIdVoice, isGenderMatched: true };
         }
 
-        // 2. Jika targetnya Wanita dan ada voice Indonesia yang tidak diketahui gendernya (biasanya Google ID adalah wanita)
         if (targetGender === 'female' && idVoices.length > 0) {
             return { voice: idVoices[0], isGenderMatched: true };
         }
 
-        // 3. Jika targetnya Pria tetapi di browser HANYA ada suara Indonesia Wanita (mis. Chrome standar tanpa Microsoft Ardi),
-        // kita tetap gunakan voice Bahasa Indonesia agar logat/pelafalan tetap 100% Indonesia,
-        // namun tandai isGenderMatched = false supaya pitch diturunkan menjadi suara bariton pria!
         if (idVoices.length > 0) {
             return { voice: idVoices[0], isGenderMatched: false };
         }
 
-        // 4. Fallback terakhir jika perangkat sama sekali tidak punya voice Indonesia
         const anyMatchedGender = this.voices.find(v => this.detectVoiceGender(v) === targetGender);
         if (anyMatchedGender) {
             return { voice: anyMatchedGender, isGenderMatched: true };
@@ -321,19 +349,16 @@ class VoiceCoachEngine {
         this.isSpeaking = speaking;
         if (text) this.lastSpokenText = text;
 
-        // 1. Animasi Soundwave Equalizer di Dashboard & Player
         document.querySelectorAll('.pt-voice-wave').forEach(el => {
             if (speaking) el.classList.add('active');
             else el.classList.remove('active');
         });
 
-        // 2. Highlight Card Live Command PT
         document.querySelectorAll('.pt-live-command-card').forEach(el => {
             if (speaking) el.classList.add('is-speaking');
             else el.classList.remove('is-speaking');
         });
 
-        // 3. Update Subtitle Teleprompter di Dashboard & Workout Player
         if (text) {
             const dashSub = document.getElementById('liveCoachSubtitleText');
             if (dashSub) dashSub.textContent = `"${text}"`;
@@ -343,37 +368,180 @@ class VoiceCoachEngine {
         }
     }
 
-    speak(text, onEndCallback = null) {
+    /**
+     * Request Cloud Neural Human TTS Audio (Microsoft Edge Neural Voices via Gradio API)
+     * Menghasilkan file MP3 suara manusia asli dengan intonasi dan napas natural!
+     */
+    async fetchCloudNeuralAudioUrl(text, persona, signal) {
+        const cacheKey = `${this.selectedPersona}::${text}`;
+        if (this.neuralAudioCache.has(cacheKey)) {
+            return this.neuralAudioCache.get(cacheKey);
+        }
+
+        const baseUrl = this.neuralEndpoints[0];
+        const callRes = await fetch(`${baseUrl}/gradio_api/call/tts_interface`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                data: [
+                    text,
+                    persona.neuralVoice,
+                    persona.neuralRate || 0,
+                    persona.neuralPitch || 0
+                ]
+            }),
+            signal
+        });
+
+        if (!callRes.ok) {
+            throw new Error(`Neural TTS Call Error: ${callRes.status}`);
+        }
+
+        const { event_id } = await callRes.json();
+        if (!event_id) throw new Error('No event_id from Neural TTS');
+
+        const streamRes = await fetch(`${baseUrl}/gradio_api/call/tts_interface/${event_id}`, { signal });
+        if (!streamRes.ok) {
+            throw new Error(`Neural TTS Stream Error: ${streamRes.status}`);
+        }
+
+        const sseText = await streamRes.text();
+        const lines = sseText.split('\n');
+        for (const line of lines) {
+            if (line.startsWith('data:')) {
+                const rawJson = line.slice(5).trim();
+                try {
+                    const parsed = JSON.parse(rawJson);
+                    if (Array.isArray(parsed) && parsed[0] && parsed[0].url) {
+                        const audioUrl = parsed[0].url;
+                        this.neuralAudioCache.set(cacheKey, audioUrl);
+                        return audioUrl;
+                    }
+                } catch (err) {
+                    // Lanjut ke baris berikutnya
+                }
+            }
+        }
+
+        throw new Error('Neural audio URL not found in stream');
+    }
+
+    /**
+     * Pre-load kalimat pembuka/motivasi di background agar saat diklik langsung berbunyi instan
+     */
+    preloadPhrase(text, personaKey = null) {
+        const pKey = personaKey || this.selectedPersona;
+        const persona = this.personas[pKey] || this.personas.bima;
+        const cacheKey = `${pKey}::${text}`;
+        if (this.neuralAudioCache.has(cacheKey)) return;
+
+        this.fetchCloudNeuralAudioUrl(text, persona).catch(() => {});
+    }
+
+    /**
+     * Bicara menggunakan Suara Manusia Neural (dengan fallback otomatis ke Browser TTS jika offline)
+     */
+    async speak(text, onEndCallback = null) {
         if (!text) {
             if (onEndCallback) onEndCallback();
             return;
         }
 
-        // Tetap update teleprompter meskipun suara sedang di-mute
+        // Hentikan audio/ucapan sebelumnya
+        this.stop();
+
+        const currentReqId = ++this.speakRequestId;
+        const persona = this.personas[this.selectedPersona] || this.personas.bima;
+
+        // Langsung tampilkan teks di Teleprompter & nyalakan equalizer
         this.syncVisualSpeakingState(true, text);
 
-        if (!this.synth || !this.enabled) {
+        if (!this.enabled) {
             setTimeout(() => {
-                this.syncVisualSpeakingState(false);
-                if (onEndCallback) onEndCallback();
+                if (this.speakRequestId === currentReqId) {
+                    this.syncVisualSpeakingState(false);
+                    if (onEndCallback) onEndCallback();
+                }
             }, 1500);
             return;
         }
 
-        try {
-            this.synth.cancel(); // Hentikan ucapan sebelumnya jika ada tumpang tindih
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            const persona = this.personas[this.selectedPersona] || this.personas.bima;
-            const { voice, isGenderMatched } = this.getVoiceForPersona(persona);
+        // 1. Cek apakah pengguna sudah memiliki Local Neural Voice yang cocok di browser (mis. Microsoft Edge)
+        const localMatch = this.getVoiceForPersona(persona);
+        const hasLocalTrueNeural = localMatch.voice && localMatch.isGenderMatched && (
+            localMatch.voice.name.includes('Natural') ||
+            localMatch.voice.name.includes('Neural')
+        ) && localMatch.voice.name.toLowerCase().includes(persona.neuralVoice.split('-')[2].replace('Neural', '').toLowerCase());
 
-            if (voice) {
-                utterance.voice = voice;
-            }
+        if (hasLocalTrueNeural) {
+            this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, onEndCallback);
+            return;
+        }
+
+        // 2. Gunakan Cloud Neural Human Voice (Microsoft Ardi, Dimas, Jajang, Osman, Gadis, Siti, Tuti, Yasmin)
+        try {
+            this.abortController = new AbortController();
+            const timeoutId = setTimeout(() => {
+                if (this.abortController) this.abortController.abort();
+            }, 6500);
+
+            const audioUrl = await this.fetchCloudNeuralAudioUrl(text, persona, this.abortController.signal);
+            clearTimeout(timeoutId);
+
+            // Pastikan belum dibatalkan atau diganti kalimat baru
+            if (this.speakRequestId !== currentReqId) return;
+
+            const audio = new Audio(audioUrl);
+            audio.volume = this.volume;
+            this.activeAudio = audio;
+
+            audio.onplay = () => {
+                if (this.speakRequestId === currentReqId) {
+                    this.syncVisualSpeakingState(true, text);
+                }
+            };
+
+            audio.onended = () => {
+                if (this.speakRequestId === currentReqId) {
+                    this.activeAudio = null;
+                    this.syncVisualSpeakingState(false);
+                    if (onEndCallback) onEndCallback();
+                }
+            };
+
+            audio.onerror = () => {
+                if (this.speakRequestId === currentReqId) {
+                    this.activeAudio = null;
+                    this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, onEndCallback);
+                }
+            };
+
+            await audio.play();
+        } catch (err) {
+            if (this.speakRequestId !== currentReqId) return;
+            console.info("Cloud Neural TTS fallback to local synthesis:", err.message);
+            this.speakWithBrowserSynthesis(text, persona, localMatch, currentReqId, onEndCallback);
+        }
+    }
+
+    /**
+     * Fallback ke Web Speech API Browser jika sedang Offline atau gagal koneksi
+     */
+    speakWithBrowserSynthesis(text, persona, localMatch, reqId, onEndCallback) {
+        if (!this.synth) {
+            this.syncVisualSpeakingState(false);
+            if (onEndCallback) onEndCallback();
+            return;
+        }
+
+        try {
+            this.synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            const { voice, isGenderMatched } = localMatch || this.getVoiceForPersona(persona);
+
+            if (voice) utterance.voice = voice;
             utterance.lang = 'id-ID';
 
-            // Jika Coach Pria dipilih tetapi browser hanya memiliki 1 voice Bahasa Indonesia (Wanita),
-            // turunkan pitch secara drastis ke frekuensi bariton pria (0.52 - 0.70) agar terdengar maskulin!
             if (persona.gender === 'male' && !isGenderMatched) {
                 utterance.pitch = persona.fallbackMalePitch || 0.62;
             } else if (persona.gender === 'female' && !isGenderMatched) {
@@ -386,33 +554,50 @@ class VoiceCoachEngine {
             utterance.volume = this.volume;
 
             utterance.onstart = () => {
-                this.syncVisualSpeakingState(true, text);
+                if (this.speakRequestId === reqId) {
+                    this.syncVisualSpeakingState(true, text);
+                }
             };
 
             utterance.onend = () => {
-                this.activeUtterance = null;
-                this.syncVisualSpeakingState(false);
-                if (onEndCallback) onEndCallback();
+                if (this.speakRequestId === reqId) {
+                    this.activeUtterance = null;
+                    this.syncVisualSpeakingState(false);
+                    if (onEndCallback) onEndCallback();
+                }
             };
 
             utterance.onerror = () => {
-                this.activeUtterance = null;
-                this.syncVisualSpeakingState(false);
-                if (onEndCallback) onEndCallback();
+                if (this.speakRequestId === reqId) {
+                    this.activeUtterance = null;
+                    this.syncVisualSpeakingState(false);
+                    if (onEndCallback) onEndCallback();
+                }
             };
 
             this.activeUtterance = utterance;
             this.synth.speak(utterance);
         } catch (e) {
-            console.warn("VoiceCoach speak error:", e);
             this.syncVisualSpeakingState(false);
             if (onEndCallback) onEndCallback();
         }
     }
 
     stop() {
+        this.speakRequestId++;
+        if (this.abortController) {
+            try { this.abortController.abort(); } catch (e) {}
+            this.abortController = null;
+        }
+        if (this.activeAudio) {
+            try {
+                this.activeAudio.pause();
+                this.activeAudio.currentTime = 0;
+            } catch (e) {}
+            this.activeAudio = null;
+        }
         if (this.synth) {
-            this.synth.cancel();
+            try { this.synth.cancel(); } catch (e) {}
             this.activeUtterance = null;
         }
         this.syncVisualSpeakingState(false);
@@ -422,7 +607,6 @@ class VoiceCoachEngine {
      * FITUR PT INTERAKTIF 1: Bakar Semangat Instan (Locker-Room Pep Talk)
      */
     speakMotivationBoost(profile = null) {
-        const persona = this.personas[this.selectedPersona] || this.personas.bima;
         const streak = profile?.completedDays?.length || 0;
 
         const speechesByPersona = {
@@ -440,7 +624,7 @@ class VoiceCoachEngine {
                 `Konsistensi biologis tidak pernah berbohong. Setiap repetisi terkontrol yang kamu lakukan hari ini memicu sintesis protein dan metabolisme 24 jam ke depan. Siapkan posisimu!`
             ],
             kevin: [
-                `Ayo bergerak cepat bersama Coach Kevin! Naikan detak jantungmu, bakar kalori dua kali lipat, dan jangan biarkan kakimu berhenti! Semakin deras keringatmu, semakin cepat lemak perutmu menyusut!`,
+                `Ayo bergerak cepat bersama Coach Kevin! Naikkan detak jantungmu, bakar kalori dua kali lipat, dan jangan biarkan kakimu berhenti! Semakin deras keringatmu, semakin cepat lemak perutmu menyusut!`,
                 `Energi penuh! Kecepatan dan ketahanan adalah kunci hari ini. Ayo ledakkan tenagamu dari detik pertama sampai peluit akhir!`
             ],
             maya: [
@@ -559,7 +743,6 @@ class VoiceAIPersonalTrainer {
                 }
             }
 
-            // Tampilkan teks live saat trainee sedang berbicara
             const statusLabel = document.getElementById('voiceAIStatusLabel');
             if (statusLabel && interimTranscript) {
                 statusLabel.innerHTML = `<span class="text-info"><i class="fas fa-wave-square me-1"></i> Mendengar: "${interimTranscript}..."</span>`;
@@ -658,20 +841,15 @@ class VoiceAIPersonalTrainer {
         }
     }
 
-    /**
-     * Built-in Context-Aware Expert Personal Trainer Brain
-     */
     queryLocalPTBrain(query) {
         const q = query.toLowerCase();
         const profile = window.appInstance?.profile || null;
         const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
 
-        // 0. Minta Semangat / Motivasi / Malas / Capek Mental
         if (q.includes('semangat') || q.includes('malas') || q.includes('mager') || q.includes('motivasi') || q.includes('menyerah')) {
             return `Hei, dengarkan ${persona.name}! Rasa malas atau mager itu musuh terbesar setiap calon juara. Kamu tidak perlu menunggu mood bagus untuk mulai latihan, karena justru perasaan bangga dan hormon endorfin baru akan muncul setelah kamu bergerak lima menit pertama! Ayo ambil posisi sekarang, lakukan satu set saja dulu bersama saya!`;
         }
 
-        // 1. Jadwal / Latihan Hari Ini Apa?
         if (q.includes('jadwal hari ini') || q.includes('latihan apa hari ini') || q.includes('menu latihan')) {
             const activeDay = window.appInstance?.activeDay || 1;
             const dayData = profile?.programSchedule?.find(d => d.dayNumber === activeDay);
@@ -684,68 +862,53 @@ class VoiceAIPersonalTrainer {
             }
         }
 
-        // 2. Sixpack / Perut Buncit / Lemak Perut
         if (q.includes('sixpack') || q.includes('perut buncit') || q.includes('lemak perut') || q.includes('abs') || q.includes('buncit')) {
             return "Untuk memunculkan otot sixpack dan memangkas perut buncit, rahasia utamanya ada dua: pertama, defisit kalori harian sekitar 300 hingga 500 kalori agar lapisan lemak di atas perut menipis. Kedua, latih otot core dengan gerakan di aplikasi ini seperti Plank, Bicycle Crunch, dan Leg Raises untuk menebalkan blok otot perutmu. Kurangi minuman manis dan gorengan, hasilnya akan terlihat jelas dalam 3 sampai 4 minggu!";
         }
 
-        // 3. Kebutuhan Protein & Menu Makan
         if (q.includes('protein') || q.includes('ayam') || q.includes('telur') || q.includes('whey') || q.includes('nutrisi') || q.includes('makan apa') || q.includes('menu')) {
             return "Target protein harian yang ideal untuk membentuk otot dan membakar lemak adalah 1,6 hingga 2 gram per kilogram berat badanmu. Sumber terbaik yang mudah didapat di Indonesia adalah dada ayam, putih dan kuning telur, ikan tuna atau kembung, tempe, tahu, serta susu tinggi protein. Bagi asupan proteinmu merata di sarapan, makan siang, dan makan malam ya!";
         }
 
-        // 4. Suplemen: Creatine, Whey, Pre-workout
         if (q.includes('creatine') || q.includes('kreatin') || q.includes('suplemen')) {
             return "Creatine monohydrate adalah suplemen paling aman dan paling terbukti secara sains! Cukup minum 5 gram setiap hari dengan air putih untuk meningkatkan tenaga eksplosif, mempercepat pemulihan antar set, dan membuat sel otot tampak lebih penuh dan padat.";
         }
 
-        // 5. Kardio Sebelum atau Sesudah Beban?
         if (q.includes('kardio') || q.includes('lari') || q.includes('jalan kaki')) {
             return "Strategi terbaik dari Coach: dahulukan latihan beban atau kalistenik utama saat cadangan glikogen dan tenagamu masih 100 persen penuh! Setelah sesi beban selesai, baru tutup dengan kardio seperti jalan cepat atau lari ringan 15 sampai 20 menit untuk memaksimalkan pembakaran cadangan lemak.";
         }
 
-        // 6. Pegal-pegal / Sakit Setelah Latihan (DOMS)
         if (q.includes('pegal') || q.includes('doms') || q.includes('sakit badan') || q.includes('linu') || q.includes('nyeri otot')) {
             return "Rasa pegal 1 sampai 2 hari setelah latihan itu disebut DOMS, tanda bahwa serat ototmu sedang merespons stimulus latihan dan tumbuh lebih kuat! Jangan khawatir, tetaplah bergerak ringan, minum air putih lebih banyak, makan cukup protein, dan tidur minimal 7 jam malam ini.";
         }
 
-        // 7. Push-up Belum Kuat / Pemula
         if (q.includes('push up') || q.includes('pushup') || q.includes('tangan gemetar') || q.includes('belum kuat')) {
             return "Sangat wajar untuk pemula! Jika push-up penuh di lantai masih berat, modifikasi dengan menaruh kedua tangan di tepi meja kokoh atau sofa (Incline Push-up), atau gunakan tumpuan lutut di matras (Knee Push-up). Jaga punggung tetap lurus, lakukan rutin, dalam dua minggu kekuatan dorong dadamu pasti meningkat drastis!";
         }
 
-        // 8. Lutut Sakit / Masalah Sendi saat Squat atau Lunge
         if (q.includes('lutut') || q.includes('sendi') || q.includes('sakit pas squat') || q.includes('cedera')) {
             return "Keamanan sendi adalah prioritas utama! Jika lutut terasa kurang nyaman saat squat, pastikan kamu mendorong bokong ke belakang terlebih dahulu seperti hendak duduk di kursi, tumpukan berat di tumit, dan buka lutut searah ujung jari kaki. Hindari gerakan melompat sementara waktu dan ganti dengan Glute Bridge yang sangat aman bagi lutut!";
         }
 
-        // 9. Waktu Terbaik Olahraga (Pagi / Sore / Malam)
         if (q.includes('pagi') || q.includes('malam') || q.includes('sore') || q.includes('waktu terbaik') || q.includes('jam berapa')) {
             return "Secara fisiologis, kekuatan otot dan suhu tubuh berada di puncaknya pada sore hari sekitar pukul 4 hingga 6 sore. Namun, latihan pagi hari juga luar biasa untuk mendongkrak metabolisme dan mood seharian. Jika berlatih malam hari, selesaikan minimal 1,5 jam sebelum jam tidur agar detak jantungmu sempat turun dan tidurmu tetap nyenyak!";
         }
 
-        // 10. Pernapasan Saat Latihan
         if (q.includes('napas') || q.includes('nafas') || q.includes('ngos')) {
             return "Aturan emas pernapasan biomekanik: tarik napas lewat hidung pada fase menurunkan beban atau saat otot memanjang (fase eksentrik), dan hembuskan napas kuat lewat mulut saat kamu mendorong atau mengangkat beban (fase konsentrik). Jangan pernah menahan napas terlalu lama agar tekanan darah tetap stabil!";
         }
 
-        // 11. Turun Berat Badan / Defisit Kalori
         if (q.includes('turun berat') || q.includes('diet') || q.includes('defisit') || q.includes('kurus') || q.includes('langsing')) {
             return "Kunci sukses menurunkan berat badan tanpa lemas adalah defisit kalori moderat sekitar 400 kalori di bawah TDEE harianmu. Gunakan tab Kalkulator Nutrisi di aplikasi ini untuk menghitung angka pastinya, perbanyak makan protein dan serat sayur agar kenyang lebih lama, serta tuntaskan jadwal latihan harianmu!";
         }
 
-        // 12. Bulking / Menaikkan Berat Badan & Massa Otot
         if (q.includes('bulking') || q.includes('naik berat') || q.includes('gemuk') || q.includes('otot besar') || q.includes('kurus banget')) {
             return "Untuk menambah massa otot yang bersih (Lean Bulking), kamu butuh surplus sekitar 300 kalori di atas kebutuhan harianmu dan tidur yang berkualitas. Fokus pada latihan progresif: tambah jumlah repetisi atau perlambat tempo turun gerakanmu agar tegangan otot makin maksimal!";
         }
 
-        // 13. Jawaban Kontekstual Pintar Default
         return `Pertanyaan yang bagus! Sebagai Personal Trainer-mu, ${persona.name} menyarankan tiga pilar utama untuk menjawab hal tersebut: pertama, jaga kualitas teknik dan tempo di setiap repetisi; kedua, pastikan kebutuhan protein harian serta hidrasi 2 liter air terpenuhi; dan ketiga, konsisten ikuti kurikulum latihan yang sudah kita susun. Mau kita bahas lebih spesifik soal latihan hari ini atau menu makanmu?`;
     }
 
-    /**
-     * Integrasi Google Gemini API (Real-time Live Intelligence dengan Konteks Profil)
-     */
     async queryGeminiAI(userText) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`;
         const persona = this.voiceCoach.personas[this.voiceCoach.selectedPersona] || this.voiceCoach.personas.bima;
