@@ -149,24 +149,75 @@ class VoiceCoachEngine {
         this.personas = {
             bima: {
                 name: 'Coach Bima',
-                role: 'Energetik & Disiplin Ala Spartan',
-                pitch: 0.94,
-                rate: 1.05,
+                gender: 'male',
+                role: 'Komandan Spartan — Tegas, Lantang & Tanpa Kompromi',
+                pitch: 0.85,
+                rate: 1.06,
+                fallbackMalePitch: 0.62,
                 tagline: 'Pantang menyerah sebelum batasmu tercapai! Ayo sikat habis sesi hari ini!'
             },
-            maya: {
-                name: 'Coach Maya',
-                role: 'Suportif & Detail Form Presisi',
-                pitch: 1.15,
-                rate: 1.0,
-                tagline: 'Keren banget! Atur napasmu, jaga postur tetap stabil, kamu pasti bisa!'
+            reza: {
+                name: 'Coach Reza',
+                gender: 'male',
+                role: 'Pro Bodybuilder — Berat, Berwibawa & Fokus Massa Otot',
+                pitch: 0.72,
+                rate: 0.96,
+                fallbackMalePitch: 0.52,
+                tagline: 'Rasakan setiap beban dan kontraksi! Otot besar dibangun dari repetisi yang berat dan terkontrol!'
             },
             alex: {
                 name: 'Coach Alex',
-                role: 'Fokus Mind-Muscle & Biomekanik',
-                pitch: 1.0,
+                gender: 'male',
+                role: 'Ahli Sport Science & Biomekanik — Taktis & Presisi',
+                pitch: 0.92,
+                rate: 1.02,
+                fallbackMalePitch: 0.68,
+                tagline: 'Kendalikan setiap repetisi dengan sudut biomekanik sempurna, maksimalkan aktivasi serat ototmu.'
+            },
+            kevin: {
+                name: 'Coach Kevin',
+                gender: 'male',
+                role: 'Master HIIT & Kardio — Cepat, Eksplosif & Pembakar Lemak',
+                pitch: 0.95,
+                rate: 1.14,
+                fallbackMalePitch: 0.70,
+                tagline: 'Jaga detak jantungmu tetap tinggi! Bergerak lebih cepat, bakar kalori dua kali lipat!'
+            },
+            maya: {
+                name: 'Coach Maya',
+                gender: 'female',
+                role: 'Pelatih Suportif — Ramah, Detail Form & Penuh Apresiasi',
+                pitch: 1.12,
                 rate: 1.0,
-                tagline: 'Kendalikan setiap repetisi dengan presisi, rasakan kontraksi maksimal di setiap serat otot.'
+                fallbackFemalePitch: 1.32,
+                tagline: 'Keren banget! Atur napasmu, jaga postur tetap stabil, kamu pasti bisa menuntaskan ini!'
+            },
+            nadia: {
+                name: 'Coach Nadia',
+                gender: 'female',
+                role: 'Ratu HIIT & Fat Burn — Ceria, Berenergi Tinggi &Lincah',
+                pitch: 1.24,
+                rate: 1.10,
+                fallbackFemalePitch: 1.42,
+                tagline: 'Ayo jangan kasih kendor! Bakar terus lemak perutmu dengan senyuman dan semangat penuh!'
+            },
+            sarah: {
+                name: 'Coach Sarah',
+                gender: 'female',
+                role: 'Spesialis Core, Postur & Pernapasan — Tenang & Fokus',
+                pitch: 1.04,
+                rate: 0.94,
+                fallbackFemalePitch: 1.25,
+                tagline: 'Tarik napas dalam, kunci otot inti perutmu, dan rasakan keseimbangan di seluruh tubuhmu.'
+            },
+            intan: {
+                name: 'Coach Intan',
+                gender: 'female',
+                role: 'Ahli Gizi & Transformasi Tubuh — Hangat & Memotivasi',
+                pitch: 1.16,
+                rate: 1.03,
+                fallbackFemalePitch: 1.36,
+                tagline: 'Kombinasi gerakan yang tepat dan nutrisi bersih akan membentuk tubuh impianmu lebih cepat!'
             }
         };
 
@@ -184,24 +235,83 @@ class VoiceCoachEngine {
         }
     }
 
-    getBestIndonesianVoice() {
+    /**
+     * Deteksi apakah suatu objek SpeechSynthesisVoice adalah suara Pria atau Wanita
+     */
+    detectVoiceGender(voice) {
+        if (!voice || !voice.name) return 'unknown';
+        const n = voice.name.toLowerCase();
+
+        // Daftar kata kunci suara PRIA di Windows, Edge, Chrome, Android, macOS/iOS
+        const maleKeywords = [
+            'ardi', 'andika', 'male', 'pria', 'laki', 'guy', 'david', 'mark',
+            'daniel', 'george', 'james', 'richard', 'christopher', 'eric',
+            'steffan', 'andrew', 'brian', 'rishi', 'aaron', 'arthur', 'thomas'
+        ];
+        if (maleKeywords.some(k => n.includes(k))) return 'male';
+
+        // Daftar kata kunci suara WANITA (Google Bahasa Indonesia default adalah Wanita)
+        const femaleKeywords = [
+            'gadis', 'damayanti', 'female', 'wanita', 'perempuan', 'zira', 'hazel',
+            'susan', 'linda', 'catherine', 'heera', 'jenny', 'aria', 'sara',
+            'michelle', 'ana', 'sonia', 'natasha', 'clara', 'google bahasa indonesia',
+            'samantha', 'victoria', 'karen', 'moira', 'tessa'
+        ];
+        if (femaleKeywords.some(k => n.includes(k))) return 'female';
+
+        return 'unknown';
+    }
+
+    /**
+     * Memilih suara Bahasa Indonesia terbaik yang SESUAI GENDER Coach (Pria vs Wanita).
+     * Mengembalikan { voice, isGenderMatched } agar jika browser hanya punya 1 suara (mis. wanita),
+     * sistem otomatis melakukan modulasi frekuensi (deep bass pitch) untuk Coach Pria!
+     */
+    getVoiceForPersona(persona) {
         if (!this.voices || this.voices.length === 0) {
             this.voices = this.synth ? this.synth.getVoices() : [];
         }
-        // Prioritaskan Google Bahasa Indonesia / Microsoft Gadis / Ardi Natural
-        const idNatural = this.voices.find(v =>
-            v.lang && (v.lang.toLowerCase().includes('id') || v.lang.toLowerCase().includes('ind')) &&
-            (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Online'))
+
+        const targetGender = persona?.gender || 'male';
+
+        // Filter semua voice berbahasa Indonesia / Melayu
+        const idVoices = this.voices.filter(v =>
+            v.lang && (
+                v.lang.toLowerCase().includes('id') ||
+                v.lang.toLowerCase().includes('ind') ||
+                v.lang.toLowerCase().includes('ms')
+            )
         );
-        if (idNatural) return idNatural;
 
-        const idVoice = this.voices.find(v => v.lang && (v.lang.toLowerCase().includes('id') || v.lang.toLowerCase().includes('ind')));
-        if (idVoice) return idVoice;
+        // 1. Cari suara Bahasa Indonesia yang gendernya COCOK (misal Microsoft Ardi untuk Pria, Gadis/Google untuk Wanita)
+        const matchedGenderIdVoice = idVoices.find(v => {
+            const g = this.detectVoiceGender(v);
+            return g === targetGender && (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Google'));
+        }) || idVoices.find(v => this.detectVoiceGender(v) === targetGender);
 
-        const naturalVoice = this.voices.find(v => v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Neural'));
-        if (naturalVoice) return naturalVoice;
+        if (matchedGenderIdVoice) {
+            return { voice: matchedGenderIdVoice, isGenderMatched: true };
+        }
 
-        return this.voices[0] || null;
+        // 2. Jika targetnya Wanita dan ada voice Indonesia yang tidak diketahui gendernya (biasanya Google ID adalah wanita)
+        if (targetGender === 'female' && idVoices.length > 0) {
+            return { voice: idVoices[0], isGenderMatched: true };
+        }
+
+        // 3. Jika targetnya Pria tetapi di browser HANYA ada suara Indonesia Wanita (mis. Chrome standar tanpa Microsoft Ardi),
+        // kita tetap gunakan voice Bahasa Indonesia agar logat/pelafalan tetap 100% Indonesia,
+        // namun tandai isGenderMatched = false supaya pitch diturunkan menjadi suara bariton pria!
+        if (idVoices.length > 0) {
+            return { voice: idVoices[0], isGenderMatched: false };
+        }
+
+        // 4. Fallback terakhir jika perangkat sama sekali tidak punya voice Indonesia
+        const anyMatchedGender = this.voices.find(v => this.detectVoiceGender(v) === targetGender);
+        if (anyMatchedGender) {
+            return { voice: anyMatchedGender, isGenderMatched: true };
+        }
+
+        return { voice: this.voices[0] || null, isGenderMatched: false };
     }
 
     /**
@@ -255,13 +365,23 @@ class VoiceCoachEngine {
             
             const utterance = new SpeechSynthesisUtterance(text);
             const persona = this.personas[this.selectedPersona] || this.personas.bima;
-            const voice = this.getBestIndonesianVoice();
+            const { voice, isGenderMatched } = this.getVoiceForPersona(persona);
 
             if (voice) {
                 utterance.voice = voice;
             }
             utterance.lang = 'id-ID';
-            utterance.pitch = persona.pitch;
+
+            // Jika Coach Pria dipilih tetapi browser hanya memiliki 1 voice Bahasa Indonesia (Wanita),
+            // turunkan pitch secara drastis ke frekuensi bariton pria (0.52 - 0.70) agar terdengar maskulin!
+            if (persona.gender === 'male' && !isGenderMatched) {
+                utterance.pitch = persona.fallbackMalePitch || 0.62;
+            } else if (persona.gender === 'female' && !isGenderMatched) {
+                utterance.pitch = persona.fallbackFemalePitch || 1.32;
+            } else {
+                utterance.pitch = persona.pitch;
+            }
+
             utterance.rate = persona.rate;
             utterance.volume = this.volume;
 
@@ -305,28 +425,43 @@ class VoiceCoachEngine {
         const persona = this.personas[this.selectedPersona] || this.personas.bima;
         const streak = profile?.completedDays?.length || 0;
 
-        const speechesBima = [
-            `Dengarkan saya! Rasa malas itu cuma sementara, tapi tubuh atletis dan kesehatan yang kamu bangun hari ini akan bertahan selamanya! Ayo berdiri, pasang fokusmu, kita hancurkan batas hari ini!`,
-            `Ingat alasan kenapa kamu memulai program ini! Setiap tetes keringat yang jatuh hari ini adalah lemak yang terbakar dan otot yang makin tajam. Jangan kasih kendor, gas pol sekarang juga!`,
-            `Sudah ${streak} hari kamu berjuang! Disiplin adalah jembatan antara target dan hasil nyata. Satu sesi lagi hari ini akan membuat dirimu di masa depan berterima kasih. Ayo mulai!`,
-            `Tidak ada kata menyerah di kamus kita! Saat ototmu mulai terasa panas dan bergetar, di situlah perubahan sedang terjadi. Tarik napas dalam, kunci core-mu, dan tunjukkan mental juaramu!`
-        ];
+        const speechesByPersona = {
+            bima: [
+                `Dengarkan Komandan Bima! Rasa malas itu cuma sementara, tapi tubuh atletis dan mental baja yang kamu bangun hari ini akan bertahan selamanya! Ayo berdiri, pasang kuda-kuda, kita hancurkan batas hari ini!`,
+                `Ingat alasan kenapa kamu memulai program ini! Setiap tetes keringat yang jatuh hari ini adalah lemak yang terbakar dan otot yang makin tajam. Jangan kasih kendor, gas pol sekarang juga!`,
+                `Sudah ${streak} hari kamu berjuang! Disiplin adalah jembatan antara target dan hasil nyata. Satu sesi lagi hari ini akan membuat dirimu di masa depan bangga. Ayo sikat!`
+            ],
+            reza: [
+                `Bro, dengarkan Coach Reza! Otot yang tebal dan bidang tidak datang dari zona nyaman. Rasakan beban di setiap serat ototmu, tahan kontraksinya, dan paksa tubuhmu tumbuh lebih kuat hari ini!`,
+                `Fokus pada hipertrofi dan progres! Jangan terburu-buru, kuasai bebanmu, kunci pernapasanmu, dan bangun postur juara sekarang juga!`
+            ],
+            alex: [
+                `Fokuskan pikiranmu bersama Coach Alex! Hubungkan kesadaran otak dengan serat otot yang bekerja hari ini. Kita tidak sekadar bergerak, kita sedang memahat arsitektur tubuhmu dengan biomekanik terbaik!`,
+                `Konsistensi biologis tidak pernah berbohong. Setiap repetisi terkontrol yang kamu lakukan hari ini memicu sintesis protein dan metabolisme 24 jam ke depan. Siapkan posisimu!`
+            ],
+            kevin: [
+                `Ayo bergerak cepat bersama Coach Kevin! Naikan detak jantungmu, bakar kalori dua kali lipat, dan jangan biarkan kakimu berhenti! Semakin deras keringatmu, semakin cepat lemak perutmu menyusut!`,
+                `Energi penuh! Kecepatan dan ketahanan adalah kunci hari ini. Ayo ledakkan tenagamu dari detik pertama sampai peluit akhir!`
+            ],
+            maya: [
+                `Hai Champion! Bersama Coach Maya di sini. Aku tahu kadang memulai itu terasa berat, tapi percayalah, begitu kamu menyelesaikan lima menit pertama, energimu akan langsung menyala! Kamu pasti bisa!`,
+                `Kamu tidak sendirian! Aku ada di sini untuk memastikan setiap gerakanmu aman, presisi, dan efektif. Fokus saja satu demi satu, kamu jauh lebih kuat dari yang kamu kira!`
+            ],
+            nadia: [
+                `Halo Semuanya! Coach Nadia siap membakar semangatmu! Ayo pasang senyum terbaikmu, gerakkan tubuhmu dengan lincah, dan kita lelehkan lemak membandel hari ini sampai tuntas!`,
+                `Jangan kasih kendor sedikit pun! Bayangkan betapa segarnya badanmu setelah sesi ini selesai. Ayo gas terus bersama Coach Nadia!`
+            ],
+            sarah: [
+                `Tarik napas panjang lewat hidung, hembuskan perlahan... Bersama Coach Sarah, mari kita pusatkan kekuatan dari otot inti perutmu. Gerakan yang tenang, dalam, dan terkontrol akan membentuk postur tubuh yang sangat indah.`,
+                `Rasakan setiap tarikan dan dorongan dengan penuh kesadaran. Jaga bahumu tetap rileks, kunci core-mu, dan nikmati aliran energi di tubuhmu.`
+            ],
+            intan: [
+                `Halo! Coach Intan mengingatkan: latihan hari ini adalah investasi terbaik untuk metabolisme dan kesehatan jangka panjangmu! Setiap kalori yang kita bakar sekarang akan menyempurnakan nutrisi sehat yang kamu makan!`,
+                `Konsistensi kecil setiap hari menghasilkan perubahan fisik yang luar biasa. Ayo kita tuntaskan jadwal hari ini dengan penuh kebanggaan!`
+            ]
+        };
 
-        const speechesMaya = [
-            `Hai Champion! Aku tahu kadang memulai itu terasa berat, tapi percayalah, begitu kamu menyelesaikan pemanasan lima menit pertama, energimu akan langsung menyala! Aku siap memandu setiap repetisimu hari ini!`,
-            `Kamu tidak sendirian! Aku ada di sini untuk memastikan setiap gerakanmu aman, presisi, dan efektif. Fokus saja pada satu gerakan ke gerakan berikutnya. Kamu jauh lebih kuat dari yang kamu kira!`,
-            `Luar biasa progresmu sejauh ini! Ingat, konsistensi jauh lebih penting daripada kesempurnaan. Mari nikmati sesi hari ini dengan senyuman dan napas yang teratur!`
-        ];
-
-        const speechesAlex = [
-            `Fokuskan pikiranmu! Hubungkan kesadaran otak dengan serat otot yang bekerja hari ini. Kita tidak sekadar bergerak, kita sedang memahat arsitektur tubuhmu dengan biomekanik terbaik. Mari eksekusi dengan presisi!`,
-            `Konsistensi biologis tidak pernah berbohong. Setiap repetisi terkontrol yang kamu lakukan hari ini memicu sintesis protein dan metabolisme 24 jam ke depan. Siapkan posisimu!`
-        ];
-
-        let pool = speechesBima;
-        if (this.selectedPersona === 'maya') pool = speechesMaya;
-        if (this.selectedPersona === 'alex') pool = speechesAlex;
-
+        const pool = speechesByPersona[this.selectedPersona] || speechesByPersona.bima;
         const chosen = pool[Math.floor(Math.random() * pool.length)];
         this.speak(chosen);
         return chosen;
