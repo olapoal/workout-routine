@@ -63,7 +63,7 @@ Aplikasi Workout Routine terlengkap dan tercanggih dengan panduan suara instrukt
 
 ---
 
-## 🔒 Sistem Lisensi Otomatis Lynk.id & Netlify Blobs
+## 🔒 Sistem Lisensi Otomatis Lynk.id, Netlify Blobs & Supabase Database
 
 Aplikasi ini diproteksi dengan sistem **Lock Screen Eksklusif** yang otomatis membuka akses ketika customer menyelesaikan pembayaran di **Lynk.id**.
 
@@ -71,12 +71,45 @@ Aplikasi ini diproteksi dengan sistem **Lock Screen Eksklusif** yang otomatis me
 1. **Pembeli Checkout di Lynk.id**: Customer memasukkan email dan membayar produk di toko Lynk.id Anda (`https://lynk.id/olapoal`).
 2. **Webhook Lynk.id / Google Apps Script**: Lynk.id secara instan mengirim data transaksi ke endpoint serverless:
    `https://<nama-aplikasi>.netlify.app/.netlify/functions/lynk-webhook`
-3. **Penyimpanan Permanen**: Email pembeli disimpan secara permanen di cloud **Netlify Blobs** (tanpa perlu repot setup database luar).
+3. **Penyimpanan Permanen (Dual Cloud Storage)**:
+   - **Supabase Cloud PostgreSQL**: Tabel `workout_buyers` (sangat cepat, visual dashboard tabel modern).
+   - **Netlify Blobs**: Cloud database serverless bawaan Netlify sebagai backup otomatis.
 4. **Buka Akses Otomatis**:
    - Pembeli membuka website aplikasi Anda.
    - Layar terkunci (*Lock Screen*) meminta email pembelian.
-   - Pembeli mengetik emailnya, klik **"Buka Akses Program Saya"**, dan Netlify Function `verify-email` memvalidasi dalam hitungan detik.
+   - Pembeli mengetik emailnya, klik **"Buka Akses Program Saya"**, sistem memvalidasi ke Supabase/Blobs dalam hitungan detik.
    - Status lisensi tersimpan otomatis di perangkat pembeli (tidak perlu login ulang).
+
+---
+
+## 🗄️ Panduan Setup Database Supabase (3 Langkah Mudah)
+
+File skema SQL telah disediakan lengkap di file: 👉 **[`supabase-schema.sql`](supabase-schema.sql)**
+
+### Langkah 1: Buat Project di Supabase
+1. Buka [https://supabase.com](https://supabase.com) dan buat akun gratis.
+2. Klik **"New Project"**, beri nama (misal: `workout-routine`), tentukan kata sandi database, lalu klik **Create new project**.
+
+### Langkah 2: Eksekusi SQL Script
+1. Masuk ke menu **SQL Editor** (ikon terminal/SQL di menu samping kiri).
+2. Klik tombol **"New query"**.
+3. Buka file **`supabase-schema.sql`** di project ini, salin (*copy*) seluruh isinya, dan tempelkan (*paste*) ke SQL Editor Supabase.
+4. Klik tombol **"Run"** (atau tekan `Ctrl + Enter`).
+5. Selesai! Tiga tabel utama langsung terbuat:
+   - `workout_buyers`: Tabel pembeli Lynk.id & hak akses VIP.
+   - `trainee_profiles`: Tabel kuesioner assessment & program latihan.
+   - `workout_logs`: Tabel riwayat latihan harian & kalori terbakar.
+
+### Langkah 3: Ambil Kunci API & Hubungkan
+1. Di dashboard Supabase, buka menu **Project Settings** (ikon gerigi) ➜ **API**.
+2. Salin:
+   - **Project URL** (contoh: `https://xxxxxxxxxxxx.supabase.co`)
+   - **anon / public key** (kunci panjang `eyJhbGciOi...`)
+3. Masukkan ke Netlify Environment Variables:
+   - `SUPABASE_URL`: `https://xxxxxxxxxxxx.supabase.co`
+   - `SUPABASE_KEY`: `eyJhbGciOi...`
+   - `ADMIN_KEY`: `workout-admin-secret-2026` *(atau password admin pilihan Anda)*
+4. Atau masukkan langsung di menu **Portal Admin** ([admin.html](admin.html)) untuk pengujian langsung tanpa deploy ulang.
 
 ---
 

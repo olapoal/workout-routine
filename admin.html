@@ -71,6 +71,38 @@
             </div>
         </div>
 
+        <!-- Supabase Cloud Database Configuration -->
+        <div id="supabaseConfigCard" class="pro-card p-4 mb-4" style="border-left: 4px solid var(--accent-emerald);">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                <div>
+                    <h5 class="text-white fw-bold mb-1">
+                        <i class="fas fa-database text-success me-2"></i>Integrasi Database Supabase (Cloud SQL)
+                    </h5>
+                    <small class="text-secondary">Simpan seluruh data pembeli Lynk.id secara permanen ke tabel <code>workout_buyers</code> di Supabase Anda.</small>
+                </div>
+                <span id="supabaseStatusBadge" class="badge bg-secondary-subtle text-secondary px-3 py-2 rounded-pill font-monospace">
+                    <i class="fas fa-circle-question me-1"></i> Belum Terhubung
+                </span>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label text-secondary small fw-bold">Supabase Project URL</label>
+                    <input type="url" id="inputSupabaseUrl" class="form-control font-monospace" placeholder="https://xxxx.supabase.co">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label text-secondary small fw-bold">Supabase Anon Key (Public API Key)</label>
+                    <input type="password" id="inputSupabaseKey" class="form-control font-monospace" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button id="btnSaveSupabaseConfig" class="btn btn-pro-primary w-100 py-2 fw-semibold">
+                        <i class="fas fa-plug me-1"></i> Hubungkan
+                    </button>
+                </div>
+            </div>
+            <div id="supabaseFeedback" class="small mt-2 font-monospace"></div>
+        </div>
+
         <!-- Add Manual Buyer Section -->
         <div class="pro-card p-4 mb-4">
             <h5 class="text-white fw-bold mb-3"><i class="fas fa-user-plus text-success me-2"></i>Tambah Pembeli / Lisensi Manual</h5>
@@ -161,48 +193,149 @@
             loadBuyersList();
         });
 
-        async function loadBuyersList() {
-            const tbody = document.getElementById('buyersTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Menghubungkan ke server...</td></tr>';
+        // Supabase Integration State
+        let supabaseUrl = localStorage.getItem('workout_supabase_url') || '';
+        let supabaseKey = localStorage.getItem('workout_supabase_key') || '';
+
+        const inputSupaUrl = document.getElementById('inputSupabaseUrl');
+        const inputSupaKey = document.getElementById('inputSupabaseKey');
+        const supaBadge = document.getElementById('supabaseStatusBadge');
+        const supaFeedback = document.getElementById('supabaseFeedback');
+
+        if (inputSupaUrl) inputSupaUrl.value = supabaseUrl;
+        if (inputSupaKey) inputSupaKey.value = supabaseKey;
+
+        async function checkSupabaseConnection() {
+            if (!supabaseUrl || !supabaseKey) {
+                if (supaBadge) {
+                    supaBadge.className = 'badge bg-secondary-subtle text-secondary px-3 py-2 rounded-pill font-monospace';
+                    supaBadge.innerHTML = '<i class="fas fa-circle-question me-1"></i> Belum Dikonfigurasi';
+                }
+                return false;
+            }
 
             try {
-                const res = await fetch(`${ADMIN_ENDPOINT}?key=${encodeURIComponent(adminKey)}`);
-                const data = await res.json();
+                const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                const res = await fetch(`${cleanUrl}/rest/v1/workout_buyers?select=*&limit=1`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`
+                    }
+                });
 
-                if (!res.ok) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error: ${data.error || 'Akses ditolak'}</td></tr>`;
-                    return;
+                if (res.ok) {
+                    if (supaBadge) {
+                        supaBadge.className = 'badge bg-success-subtle text-success px-3 py-2 rounded-pill font-monospace';
+                        supaBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Terhubung ke Supabase';
+                    }
+                    return true;
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    if (supaBadge) {
+                        supaBadge.className = 'badge bg-danger-subtle text-danger px-3 py-2 rounded-pill font-monospace';
+                        supaBadge.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i> Gagal Terhubung';
+                    }
+                    if (supaFeedback) {
+                        supaFeedback.className = 'small text-danger font-monospace mt-2';
+                        supaFeedback.innerText = errJson.message || 'Tabel workout_buyers belum dibuat di Supabase. Jalankan script supabase-schema.sql di SQL Editor.';
+                    }
+                    return false;
                 }
-
-                const list = data.buyers || [];
-                document.getElementById('totalBuyersCount').innerText = list.length;
-
-                if (list.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada pembeli terdaftar.</td></tr>';
-                    return;
+            } catch (e) {
+                if (supaBadge) {
+                    supaBadge.className = 'badge bg-danger-subtle text-danger px-3 py-2 rounded-pill font-monospace';
+                    supaBadge.innerHTML = '<i class="fas fa-times-circle me-1"></i> Error Jaringan';
                 }
-
-                tbody.innerHTML = list.map((b, idx) => {
-                    const dateFormatted = b.purchased_at ? new Date(b.purchased_at).toLocaleString('id-ID') : '-';
-                    return `
-                        <tr>
-                            <td class="text-secondary small font-monospace">${idx + 1}</td>
-                            <td class="fw-bold text-white font-monospace">${b.email}</td>
-                            <td>${b.name || '-'}</td>
-                            <td><code class="text-success small">${b.order_id || '-'}</code></td>
-                            <td class="text-secondary small font-monospace">${dateFormatted}</td>
-                            <td>
-                                <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="revokeAccess('${b.email}')">
-                                    <i class="fas fa-trash me-1"></i> Cabut
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-warning py-4">Catatan: Netlify Functions hanya berjalan setelah dideploy di Netlify cloud atau via <code>netlify dev</code>.</td></tr>`;
+                return false;
             }
+        }
+
+        document.getElementById('btnSaveSupabaseConfig').addEventListener('click', async () => {
+            supabaseUrl = inputSupaUrl.value.trim();
+            supabaseKey = inputSupaKey.value.trim();
+
+            localStorage.setItem('workout_supabase_url', supabaseUrl);
+            localStorage.setItem('workout_supabase_key', supabaseKey);
+
+            supaFeedback.className = 'small text-info font-monospace mt-2';
+            supaFeedback.innerText = 'Menguji koneksi ke database Supabase...';
+
+            const ok = await checkSupabaseConnection();
+            if (ok) {
+                supaFeedback.className = 'small text-success font-monospace mt-2';
+                supaFeedback.innerText = 'Koneksi Supabase Berhasil! Tabel workout_buyers aktif & tersinkronisasi.';
+                loadBuyersList();
+            }
+        });
+
+        async function fetchFromSupabaseDirectly() {
+            if (!supabaseUrl || !supabaseKey) return null;
+            try {
+                const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                const res = await fetch(`${cleanUrl}/rest/v1/workout_buyers?select=*&order=created_at.desc`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`
+                    }
+                });
+                if (res.ok) {
+                    return await res.json();
+                }
+            } catch (e) {
+                console.warn("Direct Supabase fetch error:", e);
+            }
+            return null;
+        }
+
+        async function loadBuyersList() {
+            const tbody = document.getElementById('buyersTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span>Menghubungkan ke database...</td></tr>';
+
+            let list = [];
+
+            // 1. Coba ambil dari Netlify Function endpoint
+            try {
+                const res = await fetch(`${ADMIN_ENDPOINT}?key=${encodeURIComponent(adminKey)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    list = data.buyers || [];
+                }
+            } catch (netErr) {
+                console.warn("Netlify function tidak dapat dihubungi, mencoba Supabase...", netErr);
+            }
+
+            // 2. Jika Netlify Function kosong / offline (misal running via file:// atau GitHub Pages), ambil langsung dari Supabase
+            if (list.length === 0 && supabaseUrl && supabaseKey) {
+                const supaList = await fetchFromSupabaseDirectly();
+                if (supaList) {
+                    list = supaList;
+                }
+            }
+
+            document.getElementById('totalBuyersCount').innerText = list.length;
+
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada pembeli terdaftar. Tambahkan pembeli manual di atas atau tembak webhook Lynk.id.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = list.map((b, idx) => {
+                const dateFormatted = b.purchased_at || b.created_at ? new Date(b.purchased_at || b.created_at).toLocaleString('id-ID') : '-';
+                return `
+                    <tr>
+                        <td class="text-secondary small font-monospace">${idx + 1}</td>
+                        <td class="fw-bold text-white font-monospace">${b.email}</td>
+                        <td>${b.name || '-'}</td>
+                        <td><code class="text-success small">${b.order_id || '-'}</code></td>
+                        <td class="text-secondary small font-monospace">${dateFormatted}</td>
+                        <td>
+                            <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="revokeAccess('${b.email}')">
+                                <i class="fas fa-trash me-1"></i> Cabut
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         // Tambah Pembeli Manual
@@ -215,6 +348,9 @@
             feedback.className = 'small text-info font-monospace';
             feedback.innerText = 'Mendaftarkan pembeli...';
 
+            let success = false;
+
+            // Simpan ke Netlify Function jika aktif
             try {
                 const res = await fetch(ADMIN_ENDPOINT, {
                     method: 'POST',
@@ -224,21 +360,43 @@
                     },
                     body: JSON.stringify({ email, name })
                 });
+                if (res.ok) success = true;
+            } catch (err) {}
 
-                const data = await res.json();
-                if (res.ok) {
-                    feedback.className = 'small text-success font-monospace';
-                    feedback.innerText = `Berhasil! Akses untuk ${email} aktif seumur hidup.`;
-                    document.getElementById('manualEmail').value = '';
-                    document.getElementById('manualName').value = '';
-                    loadBuyersList();
-                } else {
-                    feedback.className = 'small text-danger font-monospace';
-                    feedback.innerText = data.error || 'Gagal mendaftarkan pembeli.';
-                }
-            } catch (err) {
-                feedback.className = 'small text-warning font-monospace';
-                feedback.innerText = 'Gagal menghubungi endpoint admin.';
+            // Simpan juga langsung ke Supabase jika configured
+            if (supabaseUrl && supabaseKey) {
+                try {
+                    const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                    const supaRes = await fetch(`${cleanUrl}/rest/v1/workout_buyers`, {
+                        method: 'POST',
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${supabaseKey}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'resolution=merge-duplicates'
+                        },
+                        body: JSON.stringify({
+                            email,
+                            name: name || 'Trainee VIP',
+                            order_id: `MANUAL-${Date.now()}`,
+                            product_name: '[WORKOUT] Aplikasi Workout Routine Pro',
+                            plan: 'VIP Lifetime Access',
+                            status: 'active'
+                        })
+                    });
+                    if (supaRes.ok) success = true;
+                } catch (e) {}
+            }
+
+            if (success) {
+                feedback.className = 'small text-success font-monospace';
+                feedback.innerText = `Berhasil! Akses untuk ${email} aktif seumur hidup.`;
+                document.getElementById('manualEmail').value = '';
+                document.getElementById('manualName').value = '';
+                loadBuyersList();
+            } else {
+                feedback.className = 'small text-danger font-monospace';
+                feedback.innerText = 'Gagal menyimpan pembeli ke server atau Supabase.';
             }
         });
 
@@ -246,19 +404,34 @@
         async function revokeAccess(email) {
             if (!confirm(`Cabut lisensi untuk email ${email}?`)) return;
 
+            let revoked = false;
+
             try {
                 const res = await fetch(`${ADMIN_ENDPOINT}?email=${encodeURIComponent(email)}&key=${encodeURIComponent(adminKey)}`, {
                     method: 'DELETE'
                 });
-                const data = await res.json();
-                if (res.ok) {
-                    alert(`Akses untuk ${email} telah dicabut.`);
-                    loadBuyersList();
-                } else {
-                    alert(data.error || 'Gagal mencabut akses.');
-                }
-            } catch (e) {
-                alert('Gagal menghubungi server.');
+                if (res.ok) revoked = true;
+            } catch (e) {}
+
+            if (supabaseUrl && supabaseKey) {
+                try {
+                    const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                    await fetch(`${cleanUrl}/rest/v1/workout_buyers?email=eq.${encodeURIComponent(email)}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${supabaseKey}`
+                        }
+                    });
+                    revoked = true;
+                } catch (e) {}
+            }
+
+            if (revoked) {
+                alert(`Akses untuk ${email} telah dicabut.`);
+                loadBuyersList();
+            } else {
+                alert('Gagal mencabut akses.');
             }
         }
 
@@ -294,6 +467,7 @@
         document.getElementById('btnRefreshBuyers').addEventListener('click', loadBuyersList);
 
         // Load awal
+        checkSupabaseConnection();
         loadBuyersList();
     </script>
 </body>

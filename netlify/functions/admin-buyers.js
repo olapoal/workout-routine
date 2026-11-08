@@ -1,5 +1,6 @@
 // netlify/functions/admin-buyers.js
 // Endpoint internal khusus Admin untuk memanajemen data pembeli Workout Routine
+// Mendukung dual storage: Netlify Blobs & Supabase Database
 
 exports.handler = async function(event, context) {
     const corsHeaders = {
@@ -24,6 +25,9 @@ exports.handler = async function(event, context) {
         };
     }
 
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+
     let store;
     try {
         const { getStore } = require("@netlify/blobs");
@@ -35,27 +39,49 @@ exports.handler = async function(event, context) {
     // 1. GET: Ambil daftar seluruh pembeli
     if (event.httpMethod === "GET") {
         try {
-            if (!store) {
-                return {
-                    statusCode: 200,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ buyers: [], count: 0, note: "Blobs tidak aktif di environment local" })
-                };
-            }
+            const buyersMap = new Map();
 
-            const { blobs } = await store.list();
-            const buyers = [];
-
-            for (const item of blobs) {
+            // Ambil dari Supabase jika ada
+            if (supabaseUrl && supabaseKey) {
                 try {
-                    const data = await store.get(item.key, { type: "json" });
-                    if (data) buyers.push(data);
-                } catch (readErr) {
-                    buyers.push({ email: item.key, error: "Gagal membaca detail" });
+                    const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                    const endpoint = `${cleanUrl}/rest/v1/workout_buyers?select=*&order=created_at.desc`;
+                    const res = await fetch(endpoint, {
+                        headers: {
+                            "apikey": supabaseKey,
+                            "Authorization": `Bearer ${supabaseKey}`
+                        }
+                    });
+                    if (res.ok) {
+                        const supaRows = await res.json();
+                        (supaRows || []).forEach(r => {
+                            if (r.email) buyersMap.set(r.email.toLowerCase(), r);
+                        });
+                    }
+                } catch (supaErr) {
+                    console.warn("Supabase admin list error:", supaErr.message);
                 }
             }
 
-            buyers.sort((a, b) => new Date(b.purchased_at || 0) - new Date(a.purchased_at || 0));
+            // Ambil dari Blobs jika ada
+            if (store) {
+                try {
+                    const { blobs } = await store.list();
+                    for (const item of blobs) {
+                        try {
+                            const data = await store.get(item.key, { type: "json" });
+                            if (data && data.email) {
+                                buyersMap.set(data.email.toLowerCase(), { ...data, source: "blobs" });
+                            }
+                        } catch (e) {}
+                    }
+                } catch (blobsErr) {
+                    console.warn("Blobs admin list error:", blobsErr.message);
+                }
+            }
+
+            const buyers = Array.from(buyersMap.values());
+            buyers.sort((a, b) => new Date(b.purchased_at || b.created_at || 0) - new Date(a.purchased_at || a.created_at || 0));
 
             return {
                 statusCode: 200,
@@ -91,13 +117,38 @@ exports.handler = async function(event, context) {
                 name: name,
                 order_id: body.order_id || `MANUAL-${Date.now()}`,
                 product_name: "[WORKOUT] Aplikasi Workout Routine Pro",
+                plan: "VIP Lifetime Access",
                 purchased_at: new Date().toISOString(),
                 status: "active",
                 source: "manual-admin"
             };
 
+            // Simpan ke Supabase jika aktif
+            if (supabaseUrl && supabaseKey) {
+                try {
+                    const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                    await fetch(`${cleanUrl}/rest/v1/workout_buyers`, {
+                        method: "POST",
+                        headers: {
+                            "apikey": supabaseKey,
+                            "Authorization": `Bearer ${supabaseKey}`,
+                            "Content-Type": "application/json",
+                            "Prefer": "resolution=merge-duplicates"
+                        },
+                        body: JSON.stringify(newBuyer)
+                    });
+                } catch (supaErr) {
+                    console.error("Gagal simpan ke Supabase:", supaErr.message);
+                }
+            }
+
+            // Simpan ke Blobs jika aktif
             if (store) {
-                await store.setJSON(email, newBuyer);
+                try {
+                    await store.setJSON(email, newBuyer);
+                } catch (blobsErr) {
+                    console.error("Gagal simpan ke Blobs:", blobsErr.message);
+                }
             }
 
             return {
@@ -118,16 +169,38 @@ exports.handler = async function(event, context) {
     if (event.httpMethod === "DELETE") {
         try {
             const email = (event.queryStringParameters?.email || "").trim().toLowerCase();
+
             if (!email) {
                 return {
                     statusCode: 400,
                     headers: corsHeaders,
-                    body: JSON.stringify({ error: "Parameter email wajib diisi" })
+                    body: JSON.stringify({ error: "Email target diperlukan" })
                 };
             }
 
+            // Hapus dari Supabase jika aktif
+            if (supabaseUrl && supabaseKey) {
+                try {
+                    const cleanUrl = supabaseUrl.replace(/\/$/, "");
+                    await fetch(`${cleanUrl}/rest/v1/workout_buyers?email=eq.${encodeURIComponent(email)}`, {
+                        method: "DELETE",
+                        headers: {
+                            "apikey": supabaseKey,
+                            "Authorization": `Bearer ${supabaseKey}`
+                        }
+                    });
+                } catch (supaErr) {
+                    console.error("Gagal hapus dari Supabase:", supaErr.message);
+                }
+            }
+
+            // Hapus dari Blobs jika aktif
             if (store) {
-                await store.delete(email);
+                try {
+                    await store.delete(email);
+                } catch (blobsErr) {
+                    console.error("Gagal hapus dari Blobs:", blobsErr.message);
+                }
             }
 
             return {

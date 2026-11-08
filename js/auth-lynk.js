@@ -129,12 +129,60 @@ class LynkAuthManager {
             }
         } catch (netErr) {
             console.warn("Netlify function verify-email uncontactable:", netErr);
-            
-            // Jika berjalan di file:// atau server lokal tanpa function aktif
-            const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost';
+
+            // 2. Fallback: Cek Langsung ke Supabase Database via REST API (Sangat berguna untuk GitHub Pages)
+            const supaUrl = localStorage.getItem('workout_supabase_url') || window.WORKOUT_SUPABASE_URL;
+            const supaKey = localStorage.getItem('workout_supabase_key') || window.WORKOUT_SUPABASE_KEY;
+
+            if (supaUrl && supaKey) {
+                try {
+                    const cleanUrl = supaUrl.replace(/\/$/, "");
+                    const endpoint = `${cleanUrl}/rest/v1/workout_buyers?email=eq.${encodeURIComponent(email)}&status=eq.active&select=*`;
+                    const supaRes = await fetch(endpoint, {
+                        headers: {
+                            "apikey": supaKey,
+                            "Authorization": `Bearer ${supaKey}`
+                        }
+                    });
+
+                    if (supaRes.ok) {
+                        const rows = await supaRes.json();
+                        if (rows && rows.length > 0) {
+                            const row = rows[0];
+                            const buyerData = {
+                                email: row.email,
+                                name: row.name || row.email,
+                                orderId: row.order_id || "-",
+                                plan: row.plan || "VIP Lifetime Access"
+                            };
+                            localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_EMAIL, buyerData.email);
+                            localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_NAME, buyerData.name);
+                            localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_PLAN, buyerData.plan);
+                            localStorage.removeItem(AUTH_CONFIG.STORAGE_KEY_DEMO);
+                            this.unlockApp(buyerData);
+                            if (feedbackEl) {
+                                feedbackEl.className = 'auth-feedback text-success';
+                                feedbackEl.innerText = 'Verifikasi Supabase Berhasil! Selamat datang di Pulse Fit Pro.';
+                            }
+                            return true;
+                        } else {
+                            if (feedbackEl) {
+                                feedbackEl.className = 'auth-feedback text-danger';
+                                feedbackEl.innerText = 'Email belum terdaftar sebagai pembeli aktif di database Supabase.';
+                            }
+                            return false;
+                        }
+                    }
+                } catch (supaErr) {
+                    console.warn("Direct Supabase verification check error:", supaErr);
+                }
+            }
+
+            // 3. Fallback: Lingkungan Lokal (file:// atau localhost)
+            const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             if (isLocal) {
                 localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_EMAIL, email);
-                localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_NAME, 'Trainee VIP');
+                localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_NAME, 'Trainee VIP (Lokal)');
                 localStorage.setItem(AUTH_CONFIG.STORAGE_KEY_PLAN, 'VIP Lifetime Access');
                 this.unlockApp({ email, name: 'Trainee VIP', plan: 'VIP Lifetime Access' });
                 return true;
