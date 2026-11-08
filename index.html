@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="id" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pulse Fit — Program Latihan Pribadi & Personal Trainer Suara AI</title>
+    
+    <!-- Favicon & App Icon -->
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- Bootstrap 5.3.2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Luxury Athletic Theme CSS -->
+    <link rel="stylesheet" href="css/style.css?v=2.3">
+</head>
+<body>
+
+    <!-- Confetti Container -->
+    <div id="confettiContainer"></div>
+
+    <!-- Top Minimalist Navbar -->
+    <nav class="navbar app-navbar sticky-top">
+        <div class="container-fluid px-3 px-lg-5">
+            
+            <!-- Brand Identity -->
+            <div class="brand-wrapper">
+                <img src="assets/logo.png" alt="Pulse Fit Logo" class="brand-logo-img">
+                <div>
+                    <div class="brand-text">Pulse Fit</div>
+                    <span class="brand-badge-pill">Personal Trainer Pro</span>
+                </div>
+            </div>
+
+            <!-- Center Navigation Dock (Desktop & Tablets) -->
+            <div class="d-none d-md-flex">
+                <div class="nav-dock-container">
+                    <button class="nav-dock-btn active" data-app-tab="routine">
+                        <i class="fas fa-calendar-check"></i> <span>Jadwal Harian</span>
+                    </button>
+                    <button class="nav-dock-btn" data-app-tab="exercises">
+                        <i class="fas fa-dumbbell"></i> <span>Katalog Gerakan</span>
+                    </button>
+                    <button class="nav-dock-btn" data-app-tab="voice-ai">
+                        <i class="fas fa-headset text-success"></i> <span>Coach Suara AI</span>
+                    </button>
+                    <button class="nav-dock-btn" data-app-tab="nutrition">
+                        <i class="fas fa-apple-whole text-warning"></i> <span>Nutrisi & Makro</span>
+                    </button>
+                    <button class="nav-dock-btn" data-app-tab="settings">
+                        <i class="fas fa-sliders"></i> <span>Pengaturan</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right License Pill & Session Status -->
+            <div class="d-flex align-items-center gap-2">
+                <div id="navbarUserLicense" class="d-none"></div>
+                <button id="btnRevokeLicense" class="btn btn-sm btn-outline-danger rounded-pill px-3 d-none" title="Cabut Lisensi">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Dock (Below Header on Small Screens) -->
+        <div class="container-fluid d-md-none px-3 pt-2">
+            <div class="nav-dock-container w-100 justify-content-center">
+                <button class="nav-dock-btn active btn-sm" data-app-tab="routine">
+                    <i class="fas fa-calendar-check"></i> <span>Jadwal</span>
+                </button>
+                <button class="nav-dock-btn btn-sm" data-app-tab="exercises">
+                    <i class="fas fa-dumbbell"></i> <span>Gerakan</span>
+                </button>
+                <button class="nav-dock-btn btn-sm" data-app-tab="voice-ai">
+                    <i class="fas fa-headset text-success"></i> <span>Coach AI</span>
+                </button>
+                <button class="nav-dock-btn btn-sm" data-app-tab="nutrition">
+                    <i class="fas fa-apple-whole text-warning"></i> <span>Nutrisi</span>
+                </button>
+                <button class="nav-dock-btn btn-sm" data-app-tab="settings">
+                    <i class="fas fa-sliders"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN APP CONTENT -->
+    <main class="container-fluid px-3 px-lg-5 py-4">
+
+        <!-- ======================================================== -->
+        <!-- TAB 1: JADWAL HARIAN (PROGRAM LATIHAN)                    -->
+        <!-- ======================================================== -->
+        <section id="tab-routine" class="app-tab-panel">
+            
+            <!-- Hero Trainee Profile Summary -->
+            <div class="hero-dashboard-panel mb-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-4">
+                    <div style="max-width: 650px;">
+                        <span class="pro-chip chip-active mb-3">
+                            <i class="fas fa-check-circle me-1"></i> Program Terpersonalisasi
+                        </span>
+                        <h2 class="fw-bold text-white mb-2" style="font-size: 1.85rem; letter-spacing: -0.02em;">
+                            Rencana Latihan Tubuh Anda
+                        </h2>
+                        <p class="text-secondary small mb-3">
+                            Jadwal harian dinamis dirancang otomatis berdasarkan target fisik, ketersediaan alat, dan tingkat kebugaran Anda saat ini.
+                        </p>
+                        <div id="traineeProfileSummary">
+                            <!-- Injected dynamically by app.js -->
+                        </div>
+                    </div>
+
+                    <!-- Metrics Stats -->
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="hero-stat-box">
+                            <div class="hero-stat-label mb-1">
+                                <i class="fas fa-fire text-warning me-1"></i> Streak
+                            </div>
+                            <div id="statStreakDays" class="hero-stat-value text-success">0 Hari</div>
+                            <span class="text-muted small" style="font-size: 0.72rem;">Konsistensi</span>
+                        </div>
+
+                        <div class="hero-stat-box">
+                            <div class="hero-stat-label mb-1">
+                                <i class="fas fa-chart-pie text-info me-1"></i> Selesai
+                            </div>
+                            <div id="statProgressPercent" class="hero-stat-value text-info">0%</div>
+                            <span class="text-muted small" style="font-size: 0.72rem;">Target Program</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Progress Bar -->
+                <div class="progress mt-4 bg-black bg-opacity-60" style="height: 5px; border-radius: 9999px;">
+                    <div id="statTotalProgressBar" class="progress-bar bg-success" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Day Carousel Timeline -->
+            <div class="mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Timeline Program:</span>
+                    </div>
+                    <small class="text-muted">Pilih hari untuk melihat jadwal latihan</small>
+                </div>
+                <div id="programDaysCarousel" class="timeline-scroll">
+                    <!-- Day Pills Injected by app.js -->
+                </div>
+            </div>
+
+            <!-- Today's Routine Active Card Container -->
+            <div id="todayRoutineContainer">
+                <!-- Injected dynamically by app.js -->
+            </div>
+
+            <!-- Daily Hydration Quick Tracker Section -->
+            <div class="pro-card p-4 mt-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="p-3 rounded-3" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
+                            <i class="fas fa-droplet fa-2x"></i>
+                        </div>
+                        <div>
+                            <span class="text-muted small text-uppercase fw-bold d-block mb-1" style="font-size: 0.72rem;">Target Hidrasi Air Harian</span>
+                            <h5 class="text-white fw-bold mb-0">8 Gelas Air Bersih (2.000 ml)</h5>
+                            <div class="mt-1">
+                                <span id="waterProgressText" class="text-info fw-bold font-monospace">0 / 8 Gelas</span>
+                                <span class="text-muted small ms-2" id="waterVolumeText">(0 ml / 2000 ml)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button id="btnDrinkWater" class="btn btn-outline-info rounded-pill px-4 py-2 btn-sm fw-semibold">
+                            <i class="fas fa-plus me-1"></i> Tambah 1 Gelas (250 ml)
+                        </button>
+                        <button id="btnResetWater" class="btn btn-sm btn-outline-secondary rounded-circle px-3" title="Reset Hari Ini">
+                            <i class="fas fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="progress mt-3 bg-black bg-opacity-70" style="height: 6px; border-radius: 9999px;">
+                    <div id="waterProgressBar" class="progress-bar bg-info" style="width: 0%;"></div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- TAB 2: KATALOG GERAKAN & FORM GUIDE                      -->
+        <!-- ======================================================== -->
+        <section id="tab-exercises" class="app-tab-panel d-none">
+            <div class="pro-card p-4 p-md-5 mb-4">
+                <div class="mb-4">
+                    <span class="pro-chip chip-active mb-2"><i class="fas fa-book-open me-1"></i> Exercise Form Library</span>
+                    <h3 class="fw-bold text-white mb-2" style="font-size: 1.75rem;">Katalog Gerakan & Analisis Teknik</h3>
+                    <p class="text-secondary small mb-0">Setiap gerakan dipetakan dengan animasi visual biomekanik, target otot utama dan sekunder, ritme tempo repetisi, serta teknik pernapasan yang tepat.</p>
+                </div>
+
+                <!-- Filter Kategori Chips -->
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-outline-light rounded-pill active px-3" data-exercise-filter="all">Semua Gerakan</button>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="chest">Dada & Triceps</button>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="abs">Perut & Sixpack</button>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="legs">Kaki & Bokong</button>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="cardio">Kardio & Fat Burn</button>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-exercise-filter="back">Punggung & Postur</button>
+                </div>
+            </div>
+
+            <!-- Exercises Grid Container -->
+            <div id="exerciseLibraryGrid" class="row g-4">
+                <!-- Injected dynamically by app.js -->
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- TAB 3: COACH SUARA AI (VOICE PERSONAL TRAINER)           -->
+        <!-- ======================================================== -->
+        <section id="tab-voice-ai" class="app-tab-panel d-none">
+            <div class="row g-4 justify-content-center">
+                <div class="col-lg-8">
+                    <div class="pro-card p-4 p-md-5">
+                        
+                        <!-- AI Coach Header -->
+                        <div class="d-flex align-items-center justify-content-between border-bottom border-secondary border-opacity-25 pb-3 mb-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-3 p-2 bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                    <i class="fas fa-headset fa-2x"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white fw-bold mb-0">Personal Trainer Suara AI</h4>
+                                    <small class="text-secondary" style="font-size: 0.78rem;">Konsultasi latihan, gizi & teknik via suara langsung</small>
+                                </div>
+                            </div>
+                            <span class="pro-chip chip-active">
+                                <i class="fas fa-circle text-success me-1" style="font-size: 0.5rem;"></i> Online Siap Bicara
+                            </span>
+                        </div>
+
+                        <!-- Fluid Ambient Siri/OpenAI Style Audio Stage -->
+                        <div id="voiceAIOrbStage" class="voice-ai-stage">
+                            <div class="voice-orb-container" id="btnVoiceAIMic" title="Ketuk untuk bicara">
+                                <div class="voice-orb-glow"></div>
+                                <div class="voice-orb-sphere">
+                                    <i class="fas fa-microphone"></i>
+                                </div>
+                            </div>
+
+                            <div id="voiceAIStatusLabel" class="text-white small fw-semibold mb-1">
+                                Ketuk mikrofon di atas untuk berbicara langsung dengan Coach AI
+                            </div>
+                            <small class="text-secondary" style="font-size: 0.78rem;">Coach akan langsung menjawab secara lisan dengan suara manusia</small>
+                        </div>
+
+                        <!-- Suggested Quick Questions Chips -->
+                        <div class="mb-4">
+                            <small class="text-muted d-block mb-2 font-monospace" style="font-size: 0.75rem;">
+                                PERTANYAAN POPULER:
+                            </small>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="prompt-pill" data-prompt="Gimana cara bikin sixpack dan hilangkan perut buncit?">🔥 Cara Bikin Sixpack</span>
+                                <span class="prompt-pill" data-prompt="Berapa gram kebutuhan protein harian saya?">🍗 Kebutuhan Protein Harian</span>
+                                <span class="prompt-pill" data-prompt="Apakah lebih baik kardio sebelum atau sesudah angkat beban?">⏱️ Kardio Sebelum / Sesudah Beban?</span>
+                                <span class="prompt-pill" data-prompt="Kapan waktu terbaik minum suplemen creatine?">⚡ Suplemen Creatine</span>
+                                <span class="prompt-pill" data-prompt="Badan saya pegal-pegal sekali setelah latihan, apakah normal?">💪 Cara Mengatasi DOMS (Pegal)</span>
+                                <span class="prompt-pill" data-prompt="Saya belum kuat push up di lantai, ada alternatifnya?">🏋️ Belum Kuat Push-up</span>
+                            </div>
+                        </div>
+
+                        <!-- Chat Transcript Log -->
+                        <div id="voiceAIChatLog" class="chat-transcript-box mb-3">
+                            <div class="chat-bubble-row chat-row-coach">
+                                <div class="chat-bubble bubble-coach">
+                                    <div class="bubble-header mb-1 small text-muted"><i class="fas fa-robot text-success me-1"></i>Coach AI</div>
+                                    <div class="bubble-content">
+                                        Halo! Saya Personal Trainer berbasis suara Anda. Silakan ketuk tombol mikrofon di atas dan tanyakan apa saja seputar teknik gerakan, asupan nutrisi, pola makan sixpack, atau tips pemulihan otot. Saya siap memandu Anda secara langsung!
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Text Fallback Input Form -->
+                        <div class="input-group">
+                            <input type="text" id="inputVoiceAIText" class="form-control" placeholder="Atau ketik pertanyaan Anda di sini...">
+                            <button id="btnVoiceAISendText" class="btn btn-pro-primary px-4">
+                                <i class="fas fa-paper-plane me-1"></i> Kirim
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- TAB 4: NUTRISI & MAKRONUTRISI                             -->
+        <!-- ======================================================== -->
+        <section id="tab-nutrition" class="app-tab-panel d-none">
+            <div class="row g-4 justify-content-center">
+                <div class="col-lg-8">
+                    <div class="pro-card p-4 p-md-5">
+                        <span class="pro-chip chip-active mb-2"><i class="fas fa-calculator me-1"></i> Kalkulator Nutrisi</span>
+                        <h3 class="fw-bold text-white mb-2" style="font-size: 1.75rem;">Kalkulator Kalori & Makronutrisi</h3>
+                        <p class="text-secondary small mb-4">Latihan fisik memicu pembentukan, tetapi asupan gizi menentukan hasil nyatanya. Hitung kebutuhan TDEE dan pembagian gramasi protein harian Anda.</p>
+
+                        <form id="macroCalculatorForm">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary small fw-bold">Jenis Kelamin</label>
+                                    <div class="d-flex gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="macro_gender" id="genderMale" value="male" checked>
+                                            <label class="form-check-label text-white" for="genderMale">Pria</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="macro_gender" id="genderFemale" value="female">
+                                            <label class="form-check-label text-white" for="genderFemale">Wanita</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary small fw-bold">Usia (Tahun)</label>
+                                    <input type="number" id="macroAge" class="form-control" value="25" required>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary small fw-bold">Berat Badan (kg)</label>
+                                    <input type="number" id="macroWeight" step="0.5" class="form-control" value="68" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary small fw-bold">Tinggi Badan (cm)</label>
+                                    <input type="number" id="macroHeight" class="form-control" value="172" required>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary small fw-bold">Tingkat Aktivitas Harian</label>
+                                    <select id="macroActivity" class="form-select">
+                                        <option value="1.2">Jarang Olahraga / Kerja Duduk (Sedentary)</option>
+                                        <option value="1.375" selected>Olahraga Ringan (1-3 hari/minggu)</option>
+                                        <option value="1.55">Olahraga Sedang (3-5 hari/minggu)</option>
+                                        <option value="1.725">Olahraga Berat (6-7 hari/minggu)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary small fw-bold">Target Hasil Fisik</label>
+                                    <select id="macroGoal" class="form-select">
+                                        <option value="cut" selected>Defisit Kalori (Fat Loss / Sixpack & Perut Buncit)</option>
+                                        <option value="maintain">Pertahankan Berat Badan (Body Recomposition)</option>
+                                        <option value="bulk">Surplus Kalori (Bulking & Tambah Massa Otot)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-pro-primary w-100 py-3 fw-bold">
+                                <i class="fas fa-calculator me-2"></i> Hitung Kebutuhan Kalori & Makro
+                            </button>
+                        </form>
+
+                        <!-- Result Container -->
+                        <div id="macroResultBox" class="mt-4 p-4 rounded-3 bg-black bg-opacity-60 border border-success border-opacity-30 d-none">
+                            <h5 class="text-success fw-bold mb-3"><i class="fas fa-chart-pie me-2"></i>Rekomendasi Nutrisi Harian Anda:</h5>
+                            <div class="row g-3 text-center mb-3">
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                                        <span class="text-secondary small d-block mb-1">Total Kebutuhan Harian (TDEE)</span>
+                                        <h3 id="resTdee" class="text-white fw-bold mb-0 font-monospace">2.200 kkal</h3>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-3 bg-dark border border-success border-opacity-50">
+                                        <span class="text-success small d-block mb-1 fw-bold">Target Kalori Harian Anda</span>
+                                        <h3 id="resTargetCal" class="text-success fw-bold mb-0 font-monospace">1.750 kkal</h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 text-center">
+                                <div class="col-md-4">
+                                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                                        <span class="text-danger small fw-bold d-block mb-1">Protein</span>
+                                        <h4 id="resProtein" class="text-white fw-bold mb-0 font-monospace">136g</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                                        <span class="text-warning small fw-bold d-block mb-1">Karbohidrat</span>
+                                        <h4 id="resCarbs" class="text-white fw-bold mb-0 font-monospace">180g</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                                        <span class="text-info small fw-bold d-block mb-1">Lemak Sehat</span>
+                                        <h4 id="resFat" class="text-white fw-bold mb-0 font-monospace">48g</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- TAB 5: PENGATURAN                                         -->
+        <!-- ======================================================== -->
+        <section id="tab-settings" class="app-tab-panel d-none">
+            <div class="row g-4 justify-content-center">
+                <div class="col-lg-8">
+                    <div class="pro-card p-4 p-md-5">
+                        <h3 class="fw-bold text-white mb-4" style="font-size: 1.75rem;">Pengaturan Suara & Konfigurasi AI</h3>
+
+                        <!-- Suara Persona Personal Trainer -->
+                        <div class="mb-4 pb-4 border-bottom border-secondary border-opacity-25">
+                            <h5 class="text-white fw-bold mb-2"><i class="fas fa-volume-high text-success me-2"></i>Karakter Suara Pelatih (Voice Coach)</h5>
+                            <p class="text-secondary small mb-3">Pilih karakter instruktur suara yang memandu repetisi dan menyemangati Anda saat sesi latihan berlangsung.</p>
+                            
+                            <div class="row g-3 align-items-center mb-3">
+                                <div class="col-md-8">
+                                    <select id="settingVoicePersona" class="form-select">
+                                        <option value="bima">Coach Bima — Energetik, Lantang, Disiplin Spartan</option>
+                                        <option value="maya">Coach Maya — Ramah, Detail Form & Suportif</option>
+                                        <option value="alex">Coach Alex — Taktis & Fokus Mind-Muscle Connection</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <button id="btnTestVoiceCoach" class="btn btn-outline-success rounded-pill w-100 py-2">
+                                        <i class="fas fa-play me-1"></i> Tes Suara
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Koneksi Gemini API (Opsional) -->
+                        <div class="mb-4 pb-4 border-bottom border-secondary border-opacity-25">
+                            <h5 class="text-white fw-bold mb-2"><i class="fas fa-brain text-info me-2"></i>Google Gemini AI API Key (Opsional)</h5>
+                            <p class="text-secondary small mb-3">Aplikasi ini sudah dibekali kecerdasan PT lokal bawaan yang cepat (<200ms). Menghubungkan Gemini API Key memberikan wawasan tak terbatas untuk pertanyaan apa pun seputar fitness dan nutrisi.</p>
+                            
+                            <div class="input-group mb-2">
+                                <input type="password" id="inputGeminiApiKey" class="form-control" placeholder="Masukkan Gemini API Key (AIzaSy...)">
+                                <button id="btnSaveGeminiKey" class="btn btn-outline-info px-4">Simpan Kunci</button>
+                            </div>
+                            <small class="text-muted" style="font-size: 0.75rem;">Kunci disimpan aman hanya di browser lokal Anda.</small>
+                        </div>
+
+                        <!-- Reset Program Latihan -->
+                        <div>
+                            <h5 class="text-white fw-bold mb-2 text-danger"><i class="fas fa-arrows-rotate me-2"></i>Reset Assessment Latihan</h5>
+                            <p class="text-secondary small mb-3">Ingin mengubah level, durasi program, atau target fisik dari awal? Tekan tombol di bawah untuk mengisi ulang kuesioner.</p>
+                            <button id="btnResetAssessment" class="btn btn-outline-danger rounded-pill px-4 py-2">
+                                <i class="fas fa-redo me-1"></i> Isi Ulang Kuesioner Assessment
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- MODAL 1: ELEGAN ACTIVATION MODAL (LYNK.ID MEMBER LOGIN)  -->
+    <!-- ======================================================== -->
+    <div id="lynkPaywallModal" class="custom-app-modal active">
+        <div class="modal-dialog-card text-center">
+            
+            <div class="mb-4">
+                <img src="assets/logo.png" alt="Logo" class="rounded-3 mb-3 border border-secondary border-opacity-50 shadow-sm" style="width: 60px; height: 60px;">
+                <h3 class="fw-bold text-white mb-1">Aktivasi Akses Member</h3>
+                <div class="text-secondary small">Aplikasi Workout Routine & Voice AI Personal Trainer</div>
+            </div>
+
+            <p class="text-secondary small mb-4">
+                Masukkan alamat email yang Anda gunakan saat menyelesaikan transaksi pembayaran di <strong>Lynk.id</strong> untuk membuka kurikulum latihan dan asisten suara AI Anda.
+            </p>
+
+            <form id="formVerifyEmail" class="mb-4">
+                <div class="mb-3 text-start">
+                    <label class="form-label text-light small fw-semibold mb-2">Email Pembelian Lynk.id Anda:</label>
+                    <div class="input-luxury-box">
+                        <div class="input-luxury-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <input type="email" id="inputBuyerEmail" class="form-control input-luxury-field" placeholder="contoh: namaanda@gmail.com" required autocomplete="email">
+                    </div>
+                </div>
+
+                <div id="authFeedbackMessage" class="auth-feedback small mb-3"></div>
+
+                <button type="submit" id="btnSubmitEmail" class="btn btn-pro-primary w-100 py-3 fw-bold">
+                    Buka Akses Program Saya <i class="fas fa-arrow-right ms-2"></i>
+                </button>
+            </form>
+
+            <div class="d-flex flex-column gap-2 border-top border-secondary border-opacity-25 pt-3">
+                <a href="https://lynk.id/olapoal" target="_blank" class="btn btn-outline-warning rounded-pill btn-sm py-2 text-warning fw-semibold">
+                    <i class="fas fa-shopping-cart me-2"></i> Belum Memiliki Akses? Beli di Lynk.id (Rp 49.000 / Lifetime)
+                </a>
+                <button type="button" id="btnStartDemo" class="btn btn-demo-mode py-2 mt-1">
+                    <i class="fas fa-play-circle me-1 text-success"></i> Coba Mode Demo Cepat (Preview Gratis)
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- MODAL 2: INTERACTIVE MULTI-STEP ONBOARDING WIZARD        -->
+    <!-- ======================================================== -->
+    <div id="onboardingModal" class="custom-app-modal">
+        <div class="modal-dialog-card p-4 p-md-5" style="max-width: 620px;">
+            
+            <!-- Step Counter & Progress Bar Header -->
+            <div id="onboardingHeaderBox" class="mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="pro-chip chip-active" style="font-size: 0.72rem; padding: 0.2rem 0.65rem;">
+                        <i class="fas fa-sliders me-1"></i> Penyesuaian Program
+                    </span>
+                    <span class="text-secondary small font-monospace">
+                        Langkah <strong id="onboardingStepLabel" class="text-white">1</strong> dari 6
+                    </span>
+                </div>
+                <div class="progress bg-black bg-opacity-60" style="height: 4px; border-radius: 9999px;">
+                    <div id="onboardingProgressIndicator" class="progress-bar bg-success" style="width: 16%; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <!-- Form Container -->
+            <form id="onboardingForm">
+                
+                <!-- STEP 1: TINGKAT KEBUGARAN -->
+                <div class="onboarding-step-pane active" data-step="1">
+                    <div class="mb-3 text-start">
+                        <h4 class="text-white fw-bold mb-1" style="font-size: 1.35rem;">Apa tingkat kebugaran Anda saat ini?</h4>
+                        <p class="text-secondary small mb-0">AI akan menyesuaikan intensitas beban dan kompleksitas gerakan awal.</p>
+                    </div>
+
+                    <div class="onboarding-select-card selected" data-input-target="ob_level" data-value="beginner">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🌱</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Pemula (Beginner)</h6>
+                                <small class="text-secondary">Baru memulai atau belum pernah rutin olahraga.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_level" data-value="intermediate">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">⚡</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Menengah (Intermediate)</h6>
+                                <small class="text-secondary">Sudah rutin berolahraga selama 6+ bulan terakhir.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_level" data-value="advanced">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🏆</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Mahir (Advanced)</h6>
+                                <small class="text-secondary">Rutin berlatih intensif 2+ tahun dan ingin push batas diri.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+                    <input type="hidden" name="ob_level" id="hidden_ob_level" value="beginner">
+                </div>
+
+                <!-- STEP 2: TARGET UTAMA -->
+                <div class="onboarding-step-pane" data-step="2">
+                    <div class="mb-3 text-start">
+                        <h4 class="text-white fw-bold mb-1" style="font-size: 1.35rem;">Apa target hasil fisik utama Anda?</h4>
+                        <p class="text-secondary small mb-0">Pilih fokus tubuh yang ingin Anda capai dalam kurikulum ini.</p>
+                    </div>
+
+                    <div class="onboarding-select-card selected" data-input-target="ob_goal" data-value="sixpack">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🍫</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Otot Sixpack & Perut Ramping</h6>
+                                <small class="text-secondary">Kombinasi pembentukan core dan pengikisan lemak perut.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_goal" data-value="belly_fat">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🔥</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Hilangkan Perut Buncit</h6>
+                                <small class="text-secondary">Fokus pembakaran visceral fat dan lingkar pinggang.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_goal" data-value="fat_loss">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🏃</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Turun Berat Badan & Fat Loss</h6>
+                                <small class="text-secondary">Metabolic conditioning untuk defisit kalori maksimal.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_goal" data-value="muscle_gain">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">💪</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Massa Otot & Badan Atletis</h6>
+                                <small class="text-secondary">Hipertrofi otot dada, bahu, punggung, dan lengan.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+                    <input type="hidden" name="ob_goal" id="hidden_ob_goal" value="sixpack">
+                </div>
+
+                <!-- STEP 3: DURASI PROGRAM -->
+                <div class="onboarding-step-pane" data-step="3">
+                    <div class="mb-3 text-start">
+                        <h4 class="text-white fw-bold mb-1" style="font-size: 1.35rem;">Berapa durasi program yang Anda inginkan?</h4>
+                        <p class="text-secondary small mb-0">Pilih jangka waktu komitmen latihan Anda.</p>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_duration" data-value="7">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">⚡</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">7 Hari (Quick Kickstart)</h6>
+                                <small class="text-secondary">Tantangan cepat untuk membangkitkan kebiasaan olahraga.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_duration" data-value="14">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🔄</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">14 Hari (Body Reset)</h6>
+                                <small class="text-secondary">Mengembalikan energi dan ritme stamina tubuh.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card selected" data-input-target="ob_duration" data-value="30">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🌟</div>
+                            <div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <h6 class="text-white fw-bold mb-0">30 Hari (Total Transformation)</h6>
+                                    <span class="badge bg-success-subtle text-success small py-0 px-2" style="font-size: 0.65rem;">PALING POPULER</span>
+                                </div>
+                                <small class="text-secondary">Standar terbukti untuk melihat perubahan fisik nyata.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_duration" data-value="90">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">👑</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">3 Bulan / 90 Hari (Ultimate Rebuild)</h6>
+                                <small class="text-secondary">Transformasi jangka panjang untuk hasil permanen.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+                    <input type="hidden" name="ob_duration" id="hidden_ob_duration" value="30">
+                </div>
+
+                <!-- STEP 4: KETERSEDIAAN ALAT -->
+                <div class="onboarding-step-pane" data-step="4">
+                    <div class="mb-3 text-start">
+                        <h4 class="text-white fw-bold mb-1" style="font-size: 1.35rem;">Peralatan apa yang tersedia untuk Anda?</h4>
+                        <p class="text-secondary small mb-0">Gerakan latihan akan disesuaikan 100% dengan pilihan Anda.</p>
+                    </div>
+
+                    <div class="onboarding-select-card selected" data-input-target="ob_equipment" data-value="none">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🧘</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Tanpa Alat (Bodyweight / Kalistenik)</h6>
+                                <small class="text-secondary">Latihan fleksibel di rumah atau kamar, cukup berat tubuh sendiri.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_equipment" data-value="dumbbell">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🏋️</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Dumbbell Rumah / Gym Lengkap</h6>
+                                <small class="text-secondary">Menggunakan sepasang dumbbell atau peralatan gym komersial.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+                    <input type="hidden" name="ob_equipment" id="hidden_ob_equipment" value="none">
+                </div>
+
+                <!-- STEP 5: WAKTU & FREKUENSI -->
+                <div class="onboarding-step-pane" data-step="5">
+                    <div class="mb-3 text-start">
+                        <h4 class="text-white fw-bold mb-1" style="font-size: 1.35rem;">Waktu & Frekuensi Latihan Anda</h4>
+                        <p class="text-secondary small mb-0">Berapa waktu yang ingin Anda luangkan di setiap sesi?</p>
+                    </div>
+
+                    <label class="form-label text-secondary small fw-bold mb-2">Pilihan Durasi Sesi:</label>
+                    <div class="onboarding-select-card selected" data-input-target="ob_time" data-value="25">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">⏱️</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">25 – 30 Menit (Optimal Standard)</h6>
+                                <small class="text-secondary">Keseimbangan ideal antara volume dan efisiensi waktu.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_time" data-value="15">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">⚡</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">15 Menit (Express HIIT)</h6>
+                                <small class="text-secondary">Sangat cepat, cocok untuk Anda yang memiliki jadwal padat.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_time" data-value="45">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🔥</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">45 Menit (Intensive Beast)</h6>
+                                <small class="text-secondary">Volume gerakan maksimal untuk pembakaran tingkat tinggi.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+                    <input type="hidden" name="ob_time" id="hidden_ob_time" value="25">
+
+                    <label class="form-label text-secondary small fw-bold mt-2 mb-2">Frekuensi per Minggu:</label>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill btn-sm flex-grow-1 py-2 btn-freq-select" data-freq="3">3 Hari</button>
+                        <button type="button" class="btn btn-pro-primary rounded-pill btn-sm flex-grow-1 py-2 btn-freq-select active" data-freq="4">4 Hari</button>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill btn-sm flex-grow-1 py-2 btn-freq-select" data-freq="5">5 Hari</button>
+                    </div>
+                    <input type="hidden" name="ob_frequency" id="hidden_ob_frequency" value="4">
+                </div>
+
+                <!-- STEP 6: KONDISI SENDI & FISIK -->
+                <div class="onboarding-step-pane" data-step="6">
+                    <div class="mb-3 text-start">
+                        <h4 class="text-white fw-bold mb-1" style="font-size: 1.35rem;">Kondisi Sendi & Penyesuaian Fisik</h4>
+                        <p class="text-secondary small mb-0">Apakah ada keterbatasan sendi yang perlu diakomodasi?</p>
+                    </div>
+
+                    <div class="onboarding-select-card selected" data-input-target="ob_physical" data-value="none">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🛡️</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Fit 100% (Semua Gerakan Aman)</h6>
+                                <small class="text-secondary">Tidak ada keluhan sendi, bebas melakukan lompatan & squat dalam.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+
+                    <div class="onboarding-select-card" data-input-target="ob_physical" data-value="knee">
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon-box">🦵</div>
+                            <div>
+                                <h6 class="text-white fw-bold mb-0">Nyeri Lutut / Sendi (Low Impact)</h6>
+                                <small class="text-secondary">Menghilangkan lompatan keras untuk menjaga kenyamanan sendi lutut.</small>
+                            </div>
+                        </div>
+                        <span class="card-check-indicator"><i class="fas fa-check"></i></span>
+                    </div>
+                    <input type="hidden" name="ob_physical" id="hidden_ob_physical" value="none">
+                </div>
+
+                <!-- STEP GENERATION LOADING OVERLAY -->
+                <div id="onboardingLoadingBox" class="onboarding-loading-box d-none">
+                    <div class="loading-spinner-ring"></div>
+                    <h4 class="text-white fw-bold mb-2">Menyusun Program Latihan Pribadi Anda...</h4>
+                    <p class="text-secondary small mb-3">Menganalisis biomekanik, menghitung pembagian repetisi, dan menghubungkan asisten Voice Coach...</p>
+                    <div class="d-flex flex-column gap-2 max-w-400 mx-auto text-start small text-secondary">
+                        <div><i class="fas fa-check-circle text-success me-2"></i> Profil biomekanik terkonfigurasi</div>
+                        <div><i class="fas fa-check-circle text-success me-2"></i> Rotasi hari latihan & pemulihan aktif siap</div>
+                        <div><i class="fas fa-check-circle text-success me-2"></i> Modul Voice Personal Trainer terhubung</div>
+                    </div>
+                </div>
+
+                <!-- Action Navigation Footer -->
+                <div id="onboardingFooterNav" class="d-flex align-items-center justify-content-between gap-3 mt-4 pt-3 border-top border-secondary border-opacity-25">
+                    <button type="button" id="btnPrevOnboardingStep" class="btn btn-pro-secondary px-4 py-2 d-none">
+                        <i class="fas fa-arrow-left me-1"></i> Kembali
+                    </button>
+                    <button type="button" id="btnNextOnboardingStep" class="btn btn-pro-primary px-5 py-2 fw-bold ms-auto">
+                        Lanjut <i class="fas fa-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- MODAL 3: LIVE WORKOUT PLAYER (APPLE FITNESS+ STYLE)      -->
+    <!-- ======================================================== -->
+    <div id="workoutPlayerModal" class="workout-player-overlay">
+        <div class="player-main-card">
+            
+            <!-- Player Top Telemetry Header -->
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <span id="playerPhaseBadge" class="player-phase-pill phase-work">
+                    <i class="fas fa-fire me-1"></i> AKTIF BERLATIH
+                </span>
+
+                <!-- Live Calorie Ticker -->
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-black bg-opacity-50 border border-secondary border-opacity-25 px-3 py-2 rounded-pill font-monospace text-warning">
+                        <i class="fas fa-fire text-warning me-1"></i> <span id="playerLiveCalories">0 kkal</span>
+                    </span>
+                    <button id="playerBtnToggleSound" class="btn btn-sm btn-outline-secondary rounded-circle" style="width: 38px; height: 38px;" onclick="window.playerInstance.toggleMute()">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger rounded-circle" style="width: 38px; height: 38px;" onclick="window.playerInstance.stopAndClose()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Total Session Progress Line -->
+            <div class="progress mb-4 bg-black bg-opacity-70" style="height: 4px; border-radius: 9999px;">
+                <div id="playerProgressBar" class="progress-bar bg-success" style="width: 20%;"></div>
+            </div>
+
+            <!-- Exercise Biomechanical Hologram Canvas -->
+            <div id="playerAnimContainer" class="bg-black bg-opacity-50 rounded-3 p-3 mb-4 border border-secondary border-opacity-25" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                <!-- Animated SVG injected dynamically -->
+            </div>
+
+            <!-- Circular Radial Progress Timer Display -->
+            <div class="player-radial-container">
+                <svg class="radial-progress-svg" viewBox="0 0 160 160">
+                    <circle class="radial-track" cx="80" cy="80" r="70"></circle>
+                    <circle id="playerRadialProgress" class="radial-indicator" cx="80" cy="80" r="70"></circle>
+                </svg>
+                <div class="player-timer-center">
+                    <div id="playerTimerDisplay" class="player-timer-large">40</div>
+                    <span class="timer-unit-label">Detik</span>
+                </div>
+            </div>
+
+            <!-- Exercise Info -->
+            <div class="text-center mb-3">
+                <h3 id="playerExerciseTitle" class="text-white fw-bold mb-1">Push-up Standar</h3>
+                <div id="playerExerciseSubtitle" class="text-secondary small">Target Otot: Dada & Triceps</div>
+            </div>
+
+            <!-- Upcoming Exercise Preview Ticker -->
+            <div id="playerNextPreview" class="text-center p-2 mb-4 bg-dark bg-opacity-40 rounded-pill border border-secondary border-opacity-10">
+                <span class="text-muted small">Gerakan Selanjutnya:</span> <strong class="text-light ms-2">Squat</strong>
+            </div>
+
+            <!-- Tactical Player Controls -->
+            <div class="d-flex align-items-center justify-content-center gap-4">
+                <button id="playerBtnPrev" class="player-control-btn" title="Gerakan Sebelumnya" onclick="window.playerInstance.prevExercise()">
+                    <i class="fas fa-backward-step"></i>
+                </button>
+
+                <button id="playerBtnPause" class="player-control-btn btn-play-pause" title="Jeda / Lanjutkan" onclick="window.playerInstance.pauseWorkout()">
+                    <i class="fas fa-pause"></i>
+                </button>
+
+                <button id="playerBtnSkip" class="player-control-btn" title="Lewati ke Gerakan Berikutnya" onclick="window.playerInstance.nextExercise()">
+                    <i class="fas fa-forward-step"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- MODAL 4: DETAIL FORM & PANDUAN TEKNIK                     -->
+    <!-- ======================================================== -->
+    <div id="exerciseDetailModal" class="custom-app-modal">
+        <div class="modal-dialog-card" style="max-width: 720px;">
+            <div class="d-flex align-items-center justify-content-between mb-3 border-bottom border-secondary border-opacity-25 pb-3 sticky-modal-header">
+                <div>
+                    <h4 id="detailModalTitle" class="text-white fw-bold mb-0">Push-up Standar</h4>
+                    <small id="detailModalSubtitle" class="text-secondary">Standard Push-up</small>
+                </div>
+                <button class="btn btn-outline-secondary rounded-circle" onclick="window.appInstance.closeExerciseDetailModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="detailModalAnimBox" class="bg-black bg-opacity-60 rounded-3 p-3 mb-4 text-center border border-secondary border-opacity-25">
+                <!-- SVG anim inserted -->
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 h-100">
+                        <span class="text-success small fw-bold d-block mb-1">Otot Utama:</span>
+                        <div id="detailModalPrimaryMuscles" class="text-white fw-semibold">Dada (Pectorals)</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 h-100">
+                        <span class="text-info small fw-bold d-block mb-1">Otot Sekunder:</span>
+                        <div id="detailModalSecondaryMuscles" class="text-white">Triceps, Core, Bahu Depan</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 h-100">
+                        <span class="text-warning small fw-bold d-block mb-1">Tempo Rekomendasi:</span>
+                        <div id="detailModalTempo" class="text-white font-monospace">2s turun, 1s tahan, 1s dorong</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 h-100">
+                        <span class="text-primary small fw-bold d-block mb-1">Pola Pernapasan:</span>
+                        <div id="detailModalBreathing" class="text-white small">Tarik napas saat turun, buang saat dorong</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Steps & Mistakes -->
+            <div class="mb-4">
+                <h6 class="text-white fw-bold mb-2"><i class="fas fa-check-double text-success me-2"></i>Langkah Eksekusi Form yang Benar:</h6>
+                <ul id="detailModalSteps" class="text-light small list-unstyled ps-0 mb-3">
+                    <!-- Steps injected -->
+                </ul>
+
+                <h6 class="text-white fw-bold mb-2 text-danger"><i class="fas fa-triangle-exclamation me-2"></i>Kesalahan Umum yang Wajib Dihindari:</h6>
+                <ul id="detailModalMistakes" class="small list-unstyled ps-1 mb-0">
+                    <!-- Mistakes injected -->
+                </ul>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button id="btnDetailListenCoach" class="btn btn-pro-primary w-100 py-3 fw-bold">
+                    <i class="fas fa-volume-high me-2"></i> Dengarkan Suara Panduan Pelatih
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- MODAL 5: SESI SELESAI (CELEBRATION)                       -->
+    <!-- ======================================================== -->
+    <div id="workoutVictoryModal" class="custom-app-modal">
+        <div class="modal-dialog-card text-center" style="max-width: 520px;">
+            <div class="mb-3">
+                <i class="fas fa-trophy text-warning fa-3x mb-3"></i>
+                <h3 class="text-white fw-bold mb-1">Sesi Latihan Tuntas!</h3>
+                <p class="text-success small fw-semibold mb-0">Kerja keras dan konsistensi Anda hari ini luar biasa.</p>
+            </div>
+
+            <div class="row g-3 my-4">
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                        <span class="text-muted small d-block">Kalori</span>
+                        <h5 id="victoryCalories" class="text-warning fw-bold mb-0 font-monospace">0 kkal</h5>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                        <span class="text-muted small d-block">Durasi</span>
+                        <h5 id="victoryDuration" class="text-info fw-bold mb-0 font-monospace">0 mnt</h5>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                        <span class="text-muted small d-block">Gerakan</span>
+                        <h5 id="victoryExercises" class="text-success fw-bold mb-0 font-monospace">0</h5>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25">
+                        <span class="text-muted small d-block">Total Hari</span>
+                        <h5 id="victoryStreak" class="text-primary fw-bold mb-0 font-monospace">1 Hari</h5>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-secondary small mb-4">
+                Otot Anda sekarang memerlukan cairan dan nutrisi protein untuk proses pemulihan jaringan. Istirahatlah dengan optimal untuk sesi latihan esok hari!
+            </p>
+
+            <button class="btn btn-pro-primary w-100 py-3 fw-bold" onclick="window.appInstance.closeVictoryModal()">
+                Tutup & Kembali ke Jadwal <i class="fas fa-check ms-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/exercises.js?v=2.3"></script>
+    <script src="js/voice-ai.js?v=2.3"></script>
+    <script src="js/workout-player.js?v=2.3"></script>
+    <script src="js/auth-lynk.js?v=2.3"></script>
+    <script src="js/app.js?v=2.3"></script>
+</body>
+</html>

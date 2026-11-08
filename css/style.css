@@ -1,0 +1,989 @@
+/* ==========================================================================
+   css/style.css - PULSE FIT (Quiet Luxury & Elite Athletic Edition)
+   Clean, Elegant, Ultra-Refined & Professional Dark Aesthetic
+   Inspired by Apple Fitness+, WHOOP 4.0, and Equinox+
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+    /* Core Palette: Velvety Matte Obsidian & Luxury Surfaces */
+    --bg-page: #090a0f;
+    --bg-card: #11131a;
+    --bg-card-elevated: #161922;
+    --bg-card-hover: #1c202d;
+    --bg-overlay: rgba(7, 8, 12, 0.92);
+
+    /* Refined Accents (Restrained & Purposeful) */
+    --accent-emerald: #10b981;
+    --accent-emerald-subtle: rgba(16, 185, 129, 0.12);
+    --accent-emerald-border: rgba(16, 185, 129, 0.3);
+    
+    --accent-blue: #38bdf8;
+    --accent-blue-subtle: rgba(56, 189, 248, 0.12);
+    
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+
+    /* Typographic Colors */
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-dim: #475569;
+
+    /* Borders & Dividers */
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-medium: rgba(255, 255, 255, 0.14);
+    --border-focus: rgba(16, 185, 129, 0.5);
+
+    /* Typography */
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    letter-spacing: -0.015em;
+    line-height: 1.6;
+}
+
+body.workout-active-overflow {
+    overflow: hidden !important;
+}
+
+/* ==========================================================================
+   ELEGANT SURFACE & CARD COMPONENT
+   ========================================================================== */
+.pro-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.15rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+}
+
+.pro-card-hover:hover {
+    background: var(--bg-card-elevated);
+    border-color: var(--border-medium);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* ==========================================================================
+   NAVBAR & TOP HEADER
+   ========================================================================== */
+.app-navbar {
+    background: rgba(9, 10, 15, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-subtle);
+    z-index: 1020;
+    padding: 0.85rem 0;
+}
+
+.brand-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+}
+
+.brand-logo-img {
+    width: 38px;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.brand-text {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.brand-badge-pill {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    background: var(--accent-emerald-subtle);
+    color: var(--accent-emerald);
+    border: 1px solid var(--accent-emerald-border);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   MINIMALIST NAVIGATION DOCK
+   ========================================================================== */
+.nav-dock-container {
+    background: rgba(17, 19, 26, 0.8);
+    border: 1px solid var(--border-subtle);
+    border-radius: 9999px;
+    padding: 0.25rem;
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.nav-dock-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 0.45rem 1.05rem;
+    border-radius: 9999px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    text-decoration: none;
+}
+
+.nav-dock-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-dock-btn.active {
+    color: #ffffff;
+    background: var(--bg-card-hover);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   BUTTONS (SOPHISTICATED & TASTEFUL)
+   ========================================================================== */
+.btn-pro-primary {
+    background: var(--accent-emerald);
+    color: #06150e;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.75rem 1.75rem;
+    border-radius: 0.85rem;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+}
+
+.btn-pro-primary:hover {
+    background: #059669;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.btn-pro-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.92rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--border-subtle);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-pro-secondary:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: var(--border-medium);
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   REFINED HERO DASHBOARD
+   ========================================================================== */
+.hero-dashboard-panel {
+    background: linear-gradient(180deg, #12151e 0%, #0d0f16 100%);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.25rem;
+    padding: 2rem 2.25rem;
+}
+
+.pro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+}
+
+.pro-chip.chip-active {
+    background: var(--accent-emerald-subtle);
+    border-color: var(--accent-emerald-border);
+    color: var(--accent-emerald);
+    font-weight: 600;
+}
+
+.hero-stat-box {
+    background: rgba(17, 19, 26, 0.7);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1rem;
+    padding: 1rem 1.4rem;
+    text-align: center;
+    min-width: 120px;
+}
+
+.hero-stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    line-height: 1.2;
+}
+
+.hero-stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   DAY TIMELINE SELECTOR
+   ========================================================================== */
+.timeline-scroll {
+    display: flex;
+    gap: 0.65rem;
+    overflow-x: auto;
+    padding: 0.35rem 0.2rem 1rem 0.2rem;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.timeline-scroll::-webkit-scrollbar {
+    height: 5px;
+}
+.timeline-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+}
+
+.timeline-pill {
+    flex: 0 0 92px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.95rem;
+    padding: 0.85rem 0.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+}
+
+.timeline-pill:hover {
+    background: var(--bg-card-elevated);
+    border-color: var(--border-medium);
+    transform: translateY(-2px);
+}
+
+.timeline-pill.pill-active {
+    background: var(--bg-card-elevated);
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 0 1px var(--accent-emerald);
+}
+
+.timeline-pill .pill-day {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.timeline-pill .pill-icon {
+    font-size: 1.15rem;
+    color: var(--text-dim);
+    margin-bottom: 0.25rem;
+}
+
+.timeline-pill.pill-active .pill-icon {
+    color: var(--accent-emerald);
+}
+
+.timeline-pill .pill-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   EXERCISE ITEM ROW
+   ========================================================================== */
+.exercise-row {
+    background: rgba(17, 19, 26, 0.65);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.85rem;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    margin-bottom: 0.65rem;
+}
+
+.exercise-row:hover {
+    background: var(--bg-card-elevated);
+    border-color: var(--border-medium);
+}
+
+.exercise-step-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   SIRI / OPENAI STYLE AMBIENT AI VOICE ORB
+   ========================================================================== */
+.voice-ai-stage {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    position: relative;
+}
+
+.voice-orb-container {
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 1.5rem auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.voice-orb-glow {
+    position: absolute;
+    inset: -15px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+    filter: blur(12px);
+    transition: all 0.4s ease;
+}
+
+.voice-orb-sphere {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #10b981 40%, #064e3b 100%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 2px 8px rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #06150e;
+    font-size: 1.8rem;
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: orbGentleBreath 4s ease-in-out infinite alternate;
+}
+
+@keyframes orbGentleBreath {
+    0% { transform: scale(0.97); }
+    100% { transform: scale(1.03); }
+}
+
+/* Interactive States for Voice AI Orb */
+.voice-ai-stage.listening .voice-orb-sphere {
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f43f5e 45%, #881337 100%);
+    animation: orbListeningPulse 1s infinite alternate;
+}
+.voice-ai-stage.listening .voice-orb-glow {
+    background: radial-gradient(circle, rgba(244, 63, 94, 0.4) 0%, transparent 70%);
+}
+
+.voice-ai-stage.thinking .voice-orb-sphere {
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f59e0b 45%, #78350f 100%);
+    animation: orbThinkingRotate 1.5s infinite linear;
+}
+
+.voice-ai-stage.speaking .voice-orb-sphere {
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #10b981 45%, #022c22 100%);
+    animation: orbSpeakingRhythm 0.7s infinite alternate;
+}
+
+@keyframes orbListeningPulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.12); }
+}
+@keyframes orbThinkingRotate {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.06); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes orbSpeakingRhythm {
+    0% { transform: scale(0.98); }
+    100% { transform: scale(1.1); }
+}
+
+/* Chat Transcript */
+.chat-transcript-box {
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    border-radius: 0.95rem;
+    background: rgba(10, 11, 16, 0.6);
+    border: 1px solid var(--border-subtle);
+}
+
+.chat-bubble {
+    max-width: 82%;
+    padding: 0.85rem 1.2rem;
+    border-radius: 1.15rem;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+.bubble-user {
+    background: rgba(16, 185, 129, 0.16);
+    border: 1px solid var(--accent-emerald-border);
+    color: #ffffff;
+    border-bottom-right-radius: 0.25rem;
+}
+
+.bubble-coach {
+    background: var(--bg-card-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-bottom-left-radius: 0.25rem;
+}
+
+.prompt-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    border-radius: 9999px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.prompt-pill:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-medium);
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   LIVE WORKOUT PLAYER MODAL (APPLE FITNESS+ STYLE)
+   ========================================================================== */
+.workout-player-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(7, 8, 12, 0.95);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    z-index: 2500;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.workout-player-overlay.active {
+    display: flex;
+}
+
+.player-main-card {
+    width: 100%;
+    max-width: 840px;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.75rem;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+    position: relative;
+    padding: 2.25rem;
+}
+
+/* Clean Radial Progress Ring */
+.player-radial-container {
+    position: relative;
+    width: 190px;
+    height: 190px;
+    margin: 0 auto 1.25rem auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.radial-progress-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.radial-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.06);
+    stroke-width: 8;
+}
+
+.radial-indicator {
+    fill: none;
+    stroke: var(--accent-emerald);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 440;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.85s linear, stroke 0.3s ease;
+}
+
+.player-timer-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.player-timer-large {
+    font-size: 3.8rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #ffffff;
+    font-family: var(--font-mono);
+}
+
+.timer-unit-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--accent-emerald);
+    text-transform: uppercase;
+}
+
+.player-phase-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.player-phase-pill.phase-work {
+    background: var(--accent-emerald-subtle);
+    color: var(--accent-emerald);
+    border: 1px solid var(--accent-emerald-border);
+}
+
+.player-phase-pill.phase-rest {
+    background: var(--accent-blue-subtle);
+    color: var(--accent-blue);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.player-phase-pill.phase-prep {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--accent-amber);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.player-phase-pill.phase-paused {
+    background: rgba(244, 63, 94, 0.12);
+    color: var(--accent-rose);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+/* Control Buttons */
+.player-control-btn {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.player-control-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(1.05);
+}
+
+.player-control-btn.btn-play-pause {
+    width: 70px;
+    height: 70px;
+    background: #ffffff;
+    color: #06150e;
+    font-size: 1.6rem;
+    border: none;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
+}
+
+.player-control-btn.btn-play-pause:hover {
+    transform: scale(1.06);
+    background: #f1f5f9;
+}
+
+/* ==========================================================================
+   ELEGANT ACTIVATION / PAYWALL MODAL & DIALOGS
+   ========================================================================== */
+.custom-app-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(5, 6, 9, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.custom-app-modal.active {
+    display: flex;
+}
+
+.modal-dialog-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.5rem;
+    width: 100%;
+    max-width: 580px;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+    position: relative;
+    padding: 2.25rem;
+    margin: auto;
+}
+
+/* Sticky Header inside scrollable modals */
+.sticky-modal-header {
+    position: sticky;
+    top: -2.25rem;
+    margin-top: -0.5rem;
+    padding-top: 0.75rem;
+    background: var(--bg-card);
+    z-index: 10;
+}
+
+/* Modal Custom Scrollbars */
+.modal-dialog-card::-webkit-scrollbar,
+.player-main-card::-webkit-scrollbar {
+    width: 6px;
+}
+.modal-dialog-card::-webkit-scrollbar-track,
+.player-main-card::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 9999px;
+}
+.modal-dialog-card::-webkit-scrollbar-thumb,
+.player-main-card::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 9999px;
+}
+.modal-dialog-card::-webkit-scrollbar-thumb:hover,
+.player-main-card::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-emerald);
+}
+
+/* Forms & Inputs */
+.form-control, .form-select {
+    background: rgba(17, 19, 26, 0.85) !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: #ffffff !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.92rem !important;
+    padding: 0.75rem 1rem !important;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--accent-emerald) !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18) !important;
+}
+
+/* Global Placeholder Contrast Fix (Crisp & Legible) */
+::placeholder,
+.form-control::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: rgba(255, 255, 255, 0.48) !important;
+    opacity: 1 !important;
+}
+
+/* Bootstrap Input Group Edge Corrections */
+.input-group > .form-control:not(:last-child) {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+.input-group > .btn:last-child,
+.input-group > .input-group-text:last-child {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}
+.input-group > .input-group-text:first-child {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    background: #171a26 !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    color: var(--accent-emerald) !important;
+}
+
+/* Unified Luxury Input Box (Integrated Icon & Field) */
+.input-luxury-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: #121520;
+    border: 1.5px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.85rem;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.input-luxury-box:focus-within {
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    background: #151928;
+}
+
+.input-luxury-icon {
+    width: 46px;
+    height: 100%;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-emerald);
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.input-luxury-field {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #ffffff !important;
+    font-size: 0.95rem !important;
+    padding: 0.85rem 1rem !important;
+    width: 100%;
+}
+
+.input-luxury-field:focus {
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Demo Mode Secondary Button */
+.btn-demo-mode {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1 !important;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+}
+
+.btn-demo-mode:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+
+/* Confetti */
+.confetti-piece {
+    position: fixed;
+    top: -10px;
+    width: 8px;
+    height: 14px;
+    border-radius: 2px;
+    z-index: 4500;
+    pointer-events: none;
+    animation: confettiFall linear forwards;
+}
+
+@keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); }
+    100% { transform: translateY(105vh) rotate(720deg); }
+}
+
+/* ==========================================================================
+   MULTI-STEP ONBOARDING WIZARD & CUSTOM SELECTABLE CARDS (NO RAW RADIOS)
+   ========================================================================== */
+.onboarding-step-pane {
+    display: none;
+}
+
+.onboarding-step-pane.active {
+    display: block;
+    animation: stepSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes stepSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.onboarding-select-card {
+    background: #12141d;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1rem;
+    padding: 1.1rem 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    user-select: none;
+    position: relative;
+}
+
+.onboarding-select-card:hover {
+    background: #171b26;
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-2px);
+}
+
+.onboarding-select-card.selected {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 0 1px var(--accent-emerald), 0 8px 24px rgba(16, 185, 129, 0.12);
+}
+
+.onboarding-select-card .card-icon-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.onboarding-select-card.selected .card-icon-box {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.onboarding-select-card .card-check-indicator {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: transparent;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 0.75rem;
+}
+
+.onboarding-select-card.selected .card-check-indicator {
+    background: var(--accent-emerald);
+    border-color: var(--accent-emerald);
+    color: #06150e;
+}
+
+/* Generation Loading State Overlay */
+.onboarding-loading-box {
+    text-align: center;
+    padding: 3rem 1.5rem;
+}
+
+.loading-spinner-ring {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--accent-emerald);
+    animation: spinRing 0.9s linear infinite;
+    margin: 0 auto 1.5rem auto;
+}
+
+@keyframes spinRing {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .player-timer-large { font-size: 3rem; }
+    .player-radial-container { width: 160px; height: 160px; }
+    .hero-dashboard-panel { padding: 1.5rem; }
+}

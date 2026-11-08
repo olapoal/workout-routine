@@ -1,0 +1,12 @@
+{
+  "name": "aplikasi-workout-routine-pro",
+  "version": "1.0.0",
+  "description": "Aplikasi Workout Routine Tercanggih dengan Voice Coach & Voice AI Personal Trainer — Terintegrasi Pembayaran Lynk.id",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'Build OK'"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
