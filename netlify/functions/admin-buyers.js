@@ -25,8 +25,8 @@ exports.handler = async function(event, context) {
         };
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.SUPABASE_URL || "https://yvvwyjvkywshtrlciojo.supabase.co";
+    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_R72cwgEN58BDcKf3HhqycQ_GVxOP01V";
 
     let store;
     try {

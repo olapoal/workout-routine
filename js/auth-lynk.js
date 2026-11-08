@@ -7,6 +7,8 @@ const AUTH_CONFIG = {
     PRODUCT_NAME: "[WORKOUT] Aplikasi Workout Routine Pro",
     LYNK_PRODUCT_URL: "https://lynk.id/olapoal", // Ganti dengan tautan produk Lynk.id Anda
     VERIFY_ENDPOINT: "/.netlify/functions/verify-email",
+    DEFAULT_SUPABASE_URL: "https://yvvwyjvkywshtrlciojo.supabase.co",
+    DEFAULT_SUPABASE_KEY: "sb_publishable_R72cwgEN58BDcKf3HhqycQ_GVxOP01V",
     STORAGE_KEY_EMAIL: "workout_user_email",
     STORAGE_KEY_NAME: "workout_user_name",
     STORAGE_KEY_PLAN: "workout_user_plan",
@@ -131,8 +133,8 @@ class LynkAuthManager {
             console.warn("Netlify function verify-email uncontactable:", netErr);
 
             // 2. Fallback: Cek Langsung ke Supabase Database via REST API (Sangat berguna untuk GitHub Pages)
-            const supaUrl = localStorage.getItem('workout_supabase_url') || window.WORKOUT_SUPABASE_URL;
-            const supaKey = localStorage.getItem('workout_supabase_key') || window.WORKOUT_SUPABASE_KEY;
+            const supaUrl = localStorage.getItem('workout_supabase_url') || AUTH_CONFIG.DEFAULT_SUPABASE_URL;
+            const supaKey = localStorage.getItem('workout_supabase_key') || AUTH_CONFIG.DEFAULT_SUPABASE_KEY;
 
             if (supaUrl && supaKey) {
                 try {

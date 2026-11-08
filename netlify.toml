@@ -2,6 +2,11 @@
   publish = "."
   functions = "netlify/functions"
 
+[build.environment]
+  SUPABASE_URL = "https://yvvwyjvkywshtrlciojo.supabase.co"
+  SUPABASE_KEY = "sb_publishable_R72cwgEN58BDcKf3HhqycQ_GVxOP01V"
+  ADMIN_KEY = "workout-admin-secret-2026"
+
 [functions]
   node_bundler = "esbuild"
   included_files = ["netlify/functions/**"]

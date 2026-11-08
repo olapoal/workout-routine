@@ -56,9 +56,9 @@ exports.handler = async function(event, context) {
             console.warn("Netlify Blobs check notice:", blobsErr.message);
         }
 
-        // 2. Cek dari Supabase Database jika ada env variables (Opsional / Fallback)
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+        // 2. Cek dari Supabase Database (Prioritas Cloud Database)
+        const supabaseUrl = process.env.SUPABASE_URL || "https://yvvwyjvkywshtrlciojo.supabase.co";
+        const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_R72cwgEN58BDcKf3HhqycQ_GVxOP01V";
 
         if (supabaseUrl && supabaseKey) {
             try {
